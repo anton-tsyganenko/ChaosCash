@@ -4,6 +4,7 @@ from main_view import MainWindowView
 from db import Database
 from delegates import DateDelegate, ComboBoxDelegate
 from math import ceil, log10
+from decimal import Decimal
 
 class MainController:
     """
@@ -46,7 +47,7 @@ class MainController:
         self.currency_delegate = ComboBoxDelegate(self.view, self.currency_codes, self.currency_map_code_to_id)
 
         self.view.transaction_table.setItemDelegateForColumn(1, self.date_delegate) # Date
-        self.view.split_table.setItemDelegateForColumn(1, self.account_delegate) # Account
+        self.view.split_table.setItemDelegateForColumn(3, self.account_delegate) # Account
         self.view.split_table.setItemDelegateForColumn(5, self.currency_delegate) # Currency
         
     def connect_signals(self):
@@ -93,12 +94,12 @@ class MainController:
         self.current_account_id = account_id
         self.current_trans_id = None
         self.populate_transactions_table(account_id)
-        
+
     def populate_transactions_table(self, account_id):
         transactions = [
             (str(trans_id), date, desc,
-            f"{amount:,.{ceil(log10(denom))}f}",
-            f"{balance:,.{ceil(log10(denom))}f}",
+            format_amount(amount, denom),
+            format_amount(balance, denom),
             curr)
             for (trans_id, date, desc, amount, balance, curr, denom)
             in self.db.get_transactions_by_account_with_balance(account_id)
@@ -108,7 +109,10 @@ class MainController:
     def on_transaction_selected(self, trans_id):
         """Обрабатывает выбор транзакции в таблице."""
         self.current_trans_id = trans_id
-        splits = self.db.get_splits_by_transaction(trans_id)
+        splits = [
+            (r["split_id"], r["split_desc"], r["acc_id"], r["ext_id"], format_amount(r["amount"], r["denom"]), r["curr"], r["amnt_fix"])
+            for r in self.db.get_splits_by_transaction(trans_id)
+        ]
         self.view.update_split_table(splits, self.accounts_map_id_to_name, self.currency_map_id_to_code)
 
     def on_transaction_data_changed(self, top_left, bottom_right):
@@ -130,18 +134,18 @@ class MainController:
         split_id = self.view.split_model.index(row, 0).data(Qt.ItemDataRole.UserRole)
         
         # Получаем данные из модели
-        account_name = self.view.split_model.index(row, 1).data(Qt.ItemDataRole.DisplayRole)
+        account_name = self.view.split_model.index(row, 3).data(Qt.ItemDataRole.DisplayRole)
         account_id = self.accounts_map_name_to_id.get(account_name)
         
         desc = self.view.split_model.index(row, 2).data(Qt.ItemDataRole.DisplayRole)
-        ext_id = self.view.split_model.index(row, 3).data(Qt.ItemDataRole.DisplayRole)
+        ext_id = self.view.split_model.index(row, 1).data(Qt.ItemDataRole.DisplayRole)
         amount_str = self.view.split_model.index(row, 4).data(Qt.ItemDataRole.DisplayRole)
-        amount = float(amount_str.replace(',', '.'))
+        amount = decimal_from_str(amount_str)
         
         currency_code = self.view.split_model.index(row, 5).data(Qt.ItemDataRole.DisplayRole)
         currency_id = self.currency_map_code_to_id.get(currency_code)
 
-        amnt_fix_state = self.view.split_model.index(row, 6).checkState()
+        amnt_fix_state = self.view.split_model.index(row, 6).data(Qt.ItemDataRole.CheckStateRole)
         amnt_fix = amnt_fix_state == Qt.CheckState.Checked
 
         denominator = 1
@@ -157,3 +161,9 @@ class MainController:
         else:
             if self.db.update_split(split_id, account_id, desc, ext_id, int(amount * denominator), currency_id, amnt_fix):
                 self.update_ui_after_edit(split_id=split_id)
+
+def format_amount(amount, denom):
+    return f"{amount:,.{ceil(log10(denom))}f}"
+
+def decimal_from_str(string):
+    return Decimal(string.replace(',', '').replace(' ', ''))

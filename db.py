@@ -8,6 +8,7 @@ class Database:
     """
     def __init__(self, db_path):
         self.conn = sqlite3.connect(db_path)
+        self.conn.row_factory = sqlite3.Row
         self.cursor = self.conn.cursor()
         self.create_tables()
 
@@ -107,11 +108,24 @@ class Database:
         """Получает все сплиты для данной транзакции."""
         self.cursor.execute("""
             SELECT
-                S.ID, S.Description, S.Account, S.External_ID, S.Amount, S.Currency, S.amnt_fix
+                S.ID, S.Description, S.Account, S.External_ID, S.Amount, S.Currency, S.amnt_fix, C.Denominator
             FROM Split S
+            JOIN Currency C on S.Currency = C.ID
             WHERE S.Trans = ?
         """, (trans_id,))
-        return self.cursor.fetchall()
+        return [
+            {
+                "split_id": r["ID"],
+                "split_desc": r["Description"],
+                "acc_id": r["Account"],
+                "ext_id": r["External_ID"],
+                "amount": Decimal(r["Amount"])/r["Denominator"],
+                "curr": r["Currency"],
+                "amnt_fix": r["amnt_fix"],
+                "denom": r["Denominator"]
+            }
+            for r in self.cursor.fetchall()
+        ]
 
     def add_transaction(self, date, description):
         """Добавляет новую транзакцию."""

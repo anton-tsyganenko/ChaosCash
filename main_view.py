@@ -29,7 +29,7 @@ class MainWindowView(QMainWindow):
 
         self.account_view = QTreeView(self.splitter)
         self.account_view.setHeaderHidden(False)
-        #self.account_view.setMinimumWidth(200)
+        #self.account_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
 
         self.tables_widget = QWidget(self.splitter)
         self.tables_layout = QVBoxLayout(self.tables_widget)
@@ -41,7 +41,6 @@ class MainWindowView(QMainWindow):
         self.split_table = QTableView(self.tables_widget)
         self.split_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.split_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
-        self.split_table.horizontalHeader().setStretchLastSection(True)
         
         self.tables_layout.addWidget(self.transaction_table)
         self.tables_layout.addWidget(self.split_table)
@@ -153,19 +152,20 @@ class MainWindowView(QMainWindow):
     def update_split_table(self, splits, accounts_map, currencies_map):
         """Заполняет таблицу сплитов."""
         self.split_model.clear()
-        self.split_model.setHorizontalHeaderLabels(['ID', 'Account', 'Description', 'External ID', 'Amount', 'Currency', 'Fixed Amount'])
+        self.split_model.setHorizontalHeaderLabels(['ID', 'External ID', 'Description', 'Account' , 'Amount', 'Currency', 'Fixed'])
         for split_id, desc, account_id, ext_id, amount, currency_id, amnt_fix in splits:
             row = [
                 QStandardItem(str(split_id)),
-                QStandardItem(accounts_map.get(account_id, "N/A")),
-                QStandardItem(desc),
                 QStandardItem(ext_id),
-                QStandardItem(f"{amount / 100:.2f}"),
+                QStandardItem(desc),
+                QStandardItem(accounts_map.get(account_id, "N/A")),
+                QStandardItem(amount),
                 QStandardItem(currencies_map.get(currency_id, "N/A")),
                 QStandardItem('') # Checkbox column
             ]
-            row[0].setData(split_id, Qt.ItemDataRole.UserRole)
-            
+            #row[0].setData(split_id, Qt.ItemDataRole.UserRole)
+            row[0].setFlags(row[0].flags() & ~Qt.ItemFlag.ItemIsEditable)
+            row[4].setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter) # amount
             # Настройка флажка для amnt_fix
             checkbox_item = row[6]
             checkbox_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsUserCheckable)
@@ -174,7 +174,6 @@ class MainWindowView(QMainWindow):
             self.split_model.appendRow(row)
 
         self.split_table.resizeColumnsToContents()
-        self.split_table.horizontalHeader().setStretchLastSection(True)
         
     def find_item_index_by_id(self, model, item_id):
         """Вспомогательный метод для поиска индекса по ID в модели."""
