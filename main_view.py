@@ -158,14 +158,16 @@ class MainWindowView(QMainWindow):
                 QStandardItem(str(split_id)),
                 QStandardItem(ext_id),
                 QStandardItem(desc),
-                QStandardItem(accounts_map.get(account_id, "N/A")),
+                QStandardItem(accounts_map[account_id]),
                 QStandardItem(amount),
-                QStandardItem(currencies_map.get(currency_id, "N/A")),
+                QStandardItem(currencies_map[currency_id]),
                 QStandardItem('') # Checkbox column
             ]
-            #row[0].setData(split_id, Qt.ItemDataRole.UserRole)
-            row[0].setFlags(row[0].flags() & ~Qt.ItemFlag.ItemIsEditable)
+
+            row[0].setFlags(row[0].flags() & ~Qt.ItemFlag.ItemIsEditable) # make id not editable
+            row[3].setData(account_id, Qt.ItemDataRole.UserRole) # account
             row[4].setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter) # amount
+            row[5].setData(currency_id, Qt.ItemDataRole.UserRole) # account
             # Настройка флажка для amnt_fix
             checkbox_item = row[6]
             checkbox_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsUserCheckable)

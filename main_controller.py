@@ -20,10 +20,9 @@ class MainController:
         # Получаем данные для делегатов
         self.accounts_list = self.db.get_accounts()
         self.accounts_map_id_to_name = {acc[0]: acc[2] for acc in self.accounts_list}
-        self.accounts_map_name_to_id = {acc[2]: acc[0] for acc in self.accounts_list}
+
 
         self.currencies = self.db.get_all_currencies()
-        self.currency_map_code_to_id = {c[1]: c[0] for c in self.currencies}
         self.currency_map_id_to_code = {c[0]: c[1] for c in self.currencies}
         self.currency_codes = [c[1] for c in self.currencies]
         
@@ -43,8 +42,8 @@ class MainController:
     def setup_delegates(self):
         """Устанавливает делегаты для таблиц в View."""
         self.date_delegate = DateDelegate()
-        self.account_delegate = ComboBoxDelegate(self.view, self.accounts_map_id_to_name.values(), self.accounts_map_name_to_id)
-        self.currency_delegate = ComboBoxDelegate(self.view, self.currency_codes, self.currency_map_code_to_id)
+        self.account_delegate = ComboBoxDelegate(self.view, self.accounts_map_id_to_name)
+        self.currency_delegate = ComboBoxDelegate(self.view, self.currency_map_id_to_code)
 
         self.view.transaction_table.setItemDelegateForColumn(1, self.date_delegate) # Date
         self.view.split_table.setItemDelegateForColumn(3, self.account_delegate) # Account
@@ -130,16 +129,14 @@ class MainController:
         split_id = self.view.split_model.index(row, 0).data()
         
         # Получаем данные из модели
-        account_name = self.view.split_model.index(row, 3).data(Qt.ItemDataRole.DisplayRole)
-        account_id = self.accounts_map_name_to_id.get(account_name)
+        account_id = self.view.split_model.index(row, 3).data(Qt.ItemDataRole.UserRole)
         
         desc = self.view.split_model.index(row, 2).data(Qt.ItemDataRole.DisplayRole)
         ext_id = self.view.split_model.index(row, 1).data(Qt.ItemDataRole.DisplayRole)
         amount_str = self.view.split_model.index(row, 4).data(Qt.ItemDataRole.DisplayRole)
         amount = decimal_from_str(amount_str)
         
-        currency_code = self.view.split_model.index(row, 5).data(Qt.ItemDataRole.DisplayRole)
-        currency_id = self.currency_map_code_to_id.get(currency_code)
+        currency_id = self.view.split_model.index(row, 5).data(Qt.ItemDataRole.UserRole)
 
         amnt_fix_state = self.view.split_model.index(row, 6).data(Qt.ItemDataRole.CheckStateRole)
         amnt_fix = amnt_fix_state == Qt.CheckState.Checked
