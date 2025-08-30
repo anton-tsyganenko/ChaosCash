@@ -57,14 +57,10 @@ class MainController:
         self.view.transaction_data_changed.connect(self.on_transaction_data_changed)
         self.view.split_data_changed.connect(self.on_split_data_changed)
 
-    def update_ui_after_edit(self, split_id=None, trans_id=None):
+    def update_ui_after_edit(self):
         """
         Полностью обновляет таблицы с сохранением активного выбора.
         """
-        if split_id is not None and trans_id is None:
-            split_data = self.db.get_splits_by_id(split_id)
-            if split_data:
-                trans_id = split_data[1]
 
         # Обрабатываем данные, полученные от базы, для правильного отображения
         accounts_data = self.db.get_accounts_with_balances()
@@ -126,12 +122,12 @@ class MainController:
         desc = self.view.transaction_model.index(row, 2).data(Qt.ItemDataRole.DisplayRole)
 
         if self.db.update_transaction(trans_id, date_str, desc):
-            QTimer.singleShot(0, lambda: self.update_ui_after_edit(trans_id=trans_id))
+            QTimer.singleShot(0, self.update_ui_after_edit)
 
     def on_split_data_changed(self, top_left, bottom_right):
         """Обрабатывает изменения в таблице сплитов."""
         row = top_left.row()
-        split_id = self.view.split_model.index(row, 0).data(Qt.ItemDataRole.UserRole)
+        split_id = self.view.split_model.index(row, 0).data()
         
         # Получаем данные из модели
         account_name = self.view.split_model.index(row, 3).data(Qt.ItemDataRole.DisplayRole)
@@ -155,12 +151,11 @@ class MainController:
                 break
 
         if split_id is None:
-            new_split_id = self.db.add_split(self.current_trans_id, account_id, desc, ext_id, int(amount * denominator), currency_id, amnt_fix)
-            if new_split_id:
-                self.update_ui_after_edit(split_id=new_split_id)
+            split_id = self.db.add_split(self.current_trans_id, account_id, desc, ext_id, int(amount * denominator), currency_id, amnt_fix)
         else:
-            if self.db.update_split(split_id, account_id, desc, ext_id, int(amount * denominator), currency_id, amnt_fix):
-                self.update_ui_after_edit(split_id=split_id)
+            self.db.update_split(split_id, account_id, desc, ext_id, int(amount * denominator), currency_id, amnt_fix)
+
+        self.update_ui_after_edit()
 
 def format_amount(amount, denom):
     return f"{amount:,.{ceil(log10(denom))}f}"

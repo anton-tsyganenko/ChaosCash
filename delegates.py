@@ -64,7 +64,7 @@ class ComboBoxDelegate(QStyledItemDelegate):
         
         # Set both the display text and the UserRole data
         if selected_id is not None:
-            model.setData(index, selected_text, Qt.ItemDataRole.DisplayRole)
+            #model.setData(index, selected_text, Qt.ItemDataRole.DisplayRole)
             model.setData(index, selected_id, Qt.ItemDataRole.UserRole)
         else:
             # Fallback for manually typed text that does not match
