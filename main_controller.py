@@ -96,7 +96,7 @@ class MainController:
         
     def populate_transactions_table(self, account_id):
         transactions = [
-            (f"{trans_id}", date, desc, 
+            (str(trans_id), date, desc,
             f"{amount:,.{ceil(log10(denom))}f}",
             f"{balance:,.{ceil(log10(denom))}f}",
             curr)

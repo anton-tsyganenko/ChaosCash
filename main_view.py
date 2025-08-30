@@ -1,7 +1,6 @@
 from PyQt6.QtWidgets import QMainWindow, QSplitter, QTreeView, QTableView, QVBoxLayout, QWidget, QHeaderView, QStyle, QStyleOptionButton, QStyledItemDelegate
 from PyQt6.QtCore import Qt, QModelIndex, pyqtSignal, QAbstractItemModel
 from PyQt6.QtGui import QStandardItemModel, QStandardItem, QBrush
-from delegates import DateDelegate, ComboBoxDelegate
 
 class MainWindowView(QMainWindow):
     """
@@ -10,7 +9,7 @@ class MainWindowView(QMainWindow):
     """
     # Определяем сигналы для передачи событий в контроллер
     account_selected = pyqtSignal(int)
-    transaction_selected = pyqtSignal(int)
+    transaction_selected = pyqtSignal(str)
     transaction_data_changed = pyqtSignal(QModelIndex, QModelIndex)
     split_data_changed = pyqtSignal(QModelIndex, QModelIndex)
 
@@ -21,7 +20,6 @@ class MainWindowView(QMainWindow):
 
         self.setup_ui()
         self.setup_models()
-        self.setup_delegates()
         self.connect_signals()
     
     def setup_ui(self):
@@ -60,11 +58,6 @@ class MainWindowView(QMainWindow):
         self.split_model = QStandardItemModel()
         self.split_table.setModel(self.split_model)
 
-    def setup_delegates(self):
-        """Устанавливает делегаты для таблиц."""
-        # Делегаты будут установлены позже, в контроллере, так как им нужны данные
-        # из модели (например, список счетов).
-        pass
 
     def connect_signals(self):
         """Соединяет сигналы виджетов с сигналами View."""
@@ -84,8 +77,7 @@ class MainWindowView(QMainWindow):
         """Передает событие клика по транзакции в контроллер."""
         # Получаем индекс первой колонки (ID) в той же строке
         id_index = self.transaction_model.index(index.row(), 0)
-        trans_id = id_index.data(Qt.ItemDataRole.UserRole)
-        
+        trans_id = id_index.data()
         if trans_id is not None:
             self.transaction_selected.emit(trans_id)
 
@@ -142,8 +134,7 @@ class MainWindowView(QMainWindow):
                 QStandardItem(balance),
                 QStandardItem(currency_code)
             ]
-            # Сохраняем ID транзакции в UserRole
-            row[0].setData(trans_id, Qt.ItemDataRole.UserRole)
+
             row[3].setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter) # amount
             row[4].setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter) # balance
             for column in (0, 3, 4, 5): # ID, amount, balance, currency:
