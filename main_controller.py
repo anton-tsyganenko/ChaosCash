@@ -5,6 +5,11 @@ from db import Database
 from delegates import DateDelegate, ComboBoxDelegate
 from math import ceil, log10
 from decimal import Decimal
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+UTC=ZoneInfo('UTC')
+local=datetime.now().astimezone().tzinfo
 
 class MainController:
     """
@@ -92,7 +97,9 @@ class MainController:
 
     def populate_transactions_table(self, account_id):
         transactions = [
-            (str(trans_id), date, desc,
+            (str(trans_id),
+            datetime.fromisoformat(date).replace(tzinfo=UTC).astimezone(local).strftime('%Y-%m-%d %H:%M:%S'), # convert UTC -> local time
+            desc,
             format_amount(amount, denom),
             format_amount(balance, denom),
             curr)
@@ -116,8 +123,9 @@ class MainController:
             return # Don't update
         
         row = top_left.row()
-        trans_id = self.view.transaction_model.index(row, 0).data(Qt.ItemDataRole.UserRole)
+        trans_id = self.view.transaction_model.index(row, 0).data(Qt.ItemDataRole.DisplayRole)
         date_str = self.view.transaction_model.index(row, 1).data(Qt.ItemDataRole.DisplayRole)
+        date_str = datetime.fromisoformat(date_str).replace(tzinfo=local).astimezone(UTC).strftime('%Y-%m-%d %H:%M:%S') # convert local time -> UTC
         desc = self.view.transaction_model.index(row, 2).data(Qt.ItemDataRole.DisplayRole)
 
         if self.db.update_transaction(trans_id, date_str, desc):
