@@ -92,7 +92,7 @@ class MainController:
     def on_account_selected(self, account_id):
         """Обрабатывает выбор счета в дереве."""
         self.current_account_id = account_id
-        self.current_trans_id = None
+        #self.current_trans_id = None
         self.populate_transactions_table(account_id)
 
     def populate_transactions_table(self, account_id):
@@ -105,7 +105,14 @@ class MainController:
             curr)
             for (trans_id, date, desc, amount, balance, curr, denom)
             in self.db.get_transactions_by_account_with_balance(account_id)
-        ]
+        ] + [[ # empty line at the end to add new transactions
+            "",
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            "",
+            "",
+            "",
+            ""
+        ]]
         self.view.update_transaction_table(transactions)
         
     def on_transaction_selected(self, trans_id):
@@ -114,7 +121,15 @@ class MainController:
         splits = [
             (r["split_id"], r["split_desc"], r["acc_id"], r["ext_id"], format_amount(r["amount"], r["denom"]), r["curr"], r["amnt_fix"])
             for r in self.db.get_splits_by_transaction(trans_id)
-        ]
+        ] + [[ # empty line at the end to add new splits
+            "",
+            "",
+            "", #self.current_trans_id,
+            "",
+            "0",
+            1, # curr
+            0
+        ]]
         self.view.update_split_table(splits, self.accounts_map_id_to_name, self.currency_map_id_to_code)
 
     def on_transaction_data_changed(self, top_left, bottom_right):
@@ -128,8 +143,12 @@ class MainController:
         date_str = datetime.fromisoformat(date_str).replace(tzinfo=local).astimezone(UTC).strftime('%Y-%m-%d %H:%M:%S') # convert local time -> UTC
         desc = self.view.transaction_model.index(row, 2).data(Qt.ItemDataRole.DisplayRole)
 
-        if self.db.update_transaction(trans_id, date_str, desc):
-            QTimer.singleShot(0, self.update_ui_after_edit)
+        if trans_id: # updating existing
+            self.db.update_transaction(trans_id, date_str, desc)
+        else: # adding new
+            self.current_trans_id = self.db.add_transaction(date_str, desc)
+            self.db.add_split(self.current_trans_id, self.current_account_id, description="", ext_id="", amount="0", currency_id=1, amnt_fix="0")
+        QTimer.singleShot(0, self.update_ui_after_edit)
 
     def on_split_data_changed(self, top_left, bottom_right):
         """Обрабатывает изменения в таблице сплитов."""
@@ -155,12 +174,14 @@ class MainController:
                 denominator = den
                 break
 
-        if split_id is None:
+        if not split_id:
             split_id = self.db.add_split(self.current_trans_id, account_id, desc, ext_id, int(amount * denominator), currency_id, amnt_fix)
         else:
             self.db.update_split(split_id, account_id, desc, ext_id, int(amount * denominator), currency_id, amnt_fix)
 
-        self.update_ui_after_edit()
+        QTimer.singleShot(0, self.update_ui_after_edit)
+
+
 
 def format_amount(amount, denom):
     return f"{amount:,.{ceil(log10(denom))}f}"

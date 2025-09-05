@@ -9,6 +9,7 @@ class Database:
     def __init__(self, db_path):
         self.conn = sqlite3.connect(db_path)
         self.conn.row_factory = sqlite3.Row
+        self.conn.execute("PRAGMA foreign_keys = ON;")
         self.cursor = self.conn.cursor()
         self.create_tables()
 
@@ -17,7 +18,7 @@ class Database:
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS Account (
                 ID INTEGER PRIMARY KEY,
-                Parent INTEGER,
+                Parent INTEGER REFERENCES Account(ID),
                 Name TEXT,
                 Code TEXT,
                 Description TEXT,
@@ -45,16 +46,13 @@ class Database:
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS Split (
                 ID INTEGER PRIMARY KEY,
-                Trans INTEGER,
-                Account INTEGER,
+                Trans INTEGER NOT NULL REFERENCES Trans(ID),
+                Account INTEGER NOT NULL REFERENCES Account(ID),
                 Description TEXT,
                 External_ID TEXT,
                 Amount INTEGER,
-                Currency INTEGER,
-                amnt_fix BOOLEAN,
-                FOREIGN KEY (Trans) REFERENCES Trans(ID),
-                FOREIGN KEY (Account) REFERENCES Account(ID),
-                FOREIGN KEY (Currency) REFERENCES Currency(ID)
+                Currency INTEGER NOT NULL REFERENCES Currency(ID),
+                amnt_fix BOOLEAN
             )
         """)
         self.conn.commit()

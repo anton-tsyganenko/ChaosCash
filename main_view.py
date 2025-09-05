@@ -158,7 +158,7 @@ class MainWindowView(QMainWindow):
                 QStandardItem(str(split_id)),
                 QStandardItem(ext_id),
                 QStandardItem(desc),
-                QStandardItem(accounts_map[account_id]),
+                QStandardItem(accounts_map.get(account_id, "")),
                 QStandardItem(amount),
                 QStandardItem(currencies_map[currency_id]),
                 QStandardItem('') # Checkbox column

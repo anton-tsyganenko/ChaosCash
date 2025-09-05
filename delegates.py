@@ -64,7 +64,7 @@ class ComboBoxDelegate(QStyledItemDelegate):
         selected_id = editor.currentData(Qt.ItemDataRole.UserRole)
 
         model.setData(index, selected_id, Qt.ItemDataRole.UserRole)
-        model.setData(index, self.id_to_name[selected_id], Qt.ItemDataRole.DisplayRole)
+        #model.setData(index, self.id_to_name.get(selected_id), Qt.ItemDataRole.DisplayRole)
         
     def updateEditorGeometry(self, editor, option, index):
         editor.setGeometry(option.rect)
