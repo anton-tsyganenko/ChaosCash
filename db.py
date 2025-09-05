@@ -110,7 +110,18 @@ class Database:
             FROM Split S
             JOIN Currency C on S.Currency = C.ID
             WHERE S.Trans = ?
-        """, (trans_id,))
+            UNION
+            select '' ID, null Description, null Account, null External_ID, -SUM(Amount), Currency, 0 amnt_fix, C.Denominator
+            from split S
+            JOIN Currency C on S.Currency = C.ID
+            where trans=?
+            group by currency
+            having SUM(Amount) <> 0
+            
+            order by
+            Currency,
+            Amount
+        """, (trans_id,trans_id))
         return [
             {
                 "split_id": r["ID"],
