@@ -1,6 +1,6 @@
 """Account tree view with context menu and drag-and-drop."""
 from PyQt6.QtWidgets import (
-    QTreeView, QMenu, QMessageBox, QInputDialog
+    QTreeView, QMenu, QMessageBox
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex
 from PyQt6.QtGui import QAction
@@ -114,12 +114,16 @@ class AccountTreeView(QTreeView):
             if node and node.account:
                 parent_id = node.account.id
 
-        name, ok = QInputDialog.getText(self, tr("New Account"), tr("Account name:"))
-        if ok and name.strip():
-            self.account_repo.insert(parent_id, name.strip(), None, None, None, "ACT")
-            self.balance_service.clear()
-            model.reload()
-            self.expandAll()
+        new_id = self.account_repo.insert(parent_id, tr("New Account"), None, None, None, "ACT")
+        self.balance_service.clear()
+        model.reload()
+        self.expandAll()
+
+        # Start inline rename on the newly created account
+        new_index = model.get_index_for_account(new_id)
+        if new_index.isValid():
+            self.scrollTo(new_index)
+            self.edit(new_index)
 
     def _delete_account(self, index: QModelIndex):
         model: AccountTreeModel = self.model()
@@ -153,8 +157,23 @@ class AccountTreeView(QTreeView):
         model.reload()
         self.expandAll()
 
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasFormat("application/x-chaoscash-account"):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasFormat("application/x-chaoscash-account"):
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
     def dropEvent(self, event):
         """Handle DnD with cycle detection."""
+        if not event.mimeData().hasFormat("application/x-chaoscash-account"):
+            event.ignore()
+            return
         target_index = self.indexAt(event.position().toPoint())
         model: AccountTreeModel = self.model()
 

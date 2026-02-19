@@ -45,8 +45,7 @@ class AppSettings:
 
     @property
     def show_thousands(self) -> bool:
-        v = self.get("show_thousands")
-        return v if isinstance(v, bool) else v == "true"
+        return bool(self.thousands_sep)
 
     @property
     def account_path_sep(self) -> str:

@@ -2,8 +2,8 @@
 import sqlite3
 import os
 from PyQt6.QtWidgets import (
-    QMainWindow, QSplitter, QVBoxLayout, QWidget, QHeaderView,
-    QFileDialog, QMessageBox, QApplication, QMenu
+    QMainWindow, QSplitter, QVBoxLayout, QHBoxLayout, QWidget, QHeaderView,
+    QFileDialog, QMessageBox, QApplication, QMenu, QPushButton
 )
 from PyQt6.QtCore import Qt, QModelIndex, QTimer
 from PyQt6.QtGui import QAction
@@ -73,7 +73,7 @@ class MainWindow(QMainWindow):
         self._refresh_integrity()
 
         add_recent_file(db_path)
-        self.setWindowTitle(f"ChaosCash — {os.path.basename(db_path)}")
+        self.setWindowTitle(os.path.basename(db_path))
         self.resize(1400, 900)
 
     # --- UI Setup ---
@@ -96,6 +96,14 @@ class MainWindow(QMainWindow):
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Toolbar above transaction list
+        trans_toolbar = QHBoxLayout()
+        self.btn_add_trans = QPushButton(tr("+ New Transaction"))
+        self.btn_add_trans.clicked.connect(self._add_transaction)
+        trans_toolbar.addWidget(self.btn_add_trans)
+        trans_toolbar.addStretch()
+        right_layout.addLayout(trans_toolbar)
 
         self.right_splitter = QSplitter(Qt.Orientation.Vertical)
 
@@ -139,6 +147,11 @@ class MainWindow(QMainWindow):
         add_acc_action = QAction(tr("&Add Account"), self)
         add_acc_action.triggered.connect(lambda: self.account_tree._add_account(QModelIndex()))
         file_menu.addAction(add_acc_action)
+
+        add_trans_action = QAction(tr("&New Transaction"), self)
+        add_trans_action.setShortcut("Ctrl+T")
+        add_trans_action.triggered.connect(self._add_transaction)
+        file_menu.addAction(add_trans_action)
 
         file_menu.addSeparator()
 
@@ -366,6 +379,20 @@ class MainWindow(QMainWindow):
             )
 
         QTimer.singleShot(0, self._on_split_changed)
+
+    def _add_transaction(self):
+        now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+        trans_id = self.trans_service.create_transaction(None, now)
+        self._current_trans_id = trans_id
+        self.split_model.load(trans_id)
+        # Reload transaction list and try to select the new transaction
+        if self._selected_account_ids:
+            self.trans_model.load(self._selected_account_ids)
+            row = self.trans_model.find_row_for_trans(trans_id)
+            if row >= 0:
+                idx = self.trans_model.index(row, 0)
+                self.transaction_view.setCurrentIndex(idx)
+        self._refresh_integrity()
 
     def _toggle_show_hidden(self, checked: bool):
         self.settings.show_hidden_accounts = checked

@@ -1,7 +1,7 @@
 """Application settings dialog."""
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
-    QCheckBox, QDialogButtonBox, QLabel, QGroupBox
+    QDialogButtonBox, QGroupBox
 )
 from app.i18n import tr
 from app.settings.app_settings import AppSettings
@@ -31,19 +31,10 @@ class SettingsDialog(QDialog):
         self.decimal_sep.setCurrentText(self.settings.decimal_sep)
         form.addRow(tr("Decimal separator:"), self.decimal_sep)
 
-        self.thousands_sep = QComboBox()
-        self.thousands_sep.addItem(tr("Space"), " ")
-        self.thousands_sep.addItem(tr("Comma"), ",")
-        self.thousands_sep.addItem(tr("Period"), ".")
-        self.thousands_sep.addItem(tr("None"), "")
-        idx = self.thousands_sep.findData(self.settings.thousands_sep)
-        if idx >= 0:
-            self.thousands_sep.setCurrentIndex(idx)
+        self.thousands_sep = QLineEdit(self.settings.thousands_sep)
+        self.thousands_sep.setPlaceholderText(tr("Leave empty to disable"))
+        self.thousands_sep.setMaxLength(4)
         form.addRow(tr("Thousands separator:"), self.thousands_sep)
-
-        self.show_thousands = QCheckBox(tr("Show thousands separator"))
-        self.show_thousands.setChecked(self.settings.show_thousands)
-        form.addRow("", self.show_thousands)
 
         layout.addWidget(display_group)
 
@@ -74,8 +65,9 @@ class SettingsDialog(QDialog):
     def _save_and_accept(self):
         self.settings.set("date_format", self.date_format.text())
         self.settings.set("decimal_sep", self.decimal_sep.currentText())
-        self.settings.set("thousands_sep", self.thousands_sep.currentData())
-        self.settings.set("show_thousands", self.show_thousands.isChecked())
+        sep = self.thousands_sep.text()
+        self.settings.set("thousands_sep", sep)
+        self.settings.set("show_thousands", bool(sep))
         self.settings.set("account_path_sep", self.path_sep.text() or ":")
         self.settings.set("account_sort", self.sort_order.currentData())
         self.accept()

@@ -187,12 +187,14 @@ class AccountTreeModel(QAbstractItemModel):
             return None
         col = index.column()
 
-        if role == Qt.ItemDataRole.DisplayRole:
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
             if col == COL_NAME:
                 return acc.name
             elif col == COL_CODE:
                 return acc.code or ""
             elif col == COL_BALANCE:
+                if role == Qt.ItemDataRole.EditRole:
+                    return None
                 if not self.settings.show_balances or node.is_virtual:
                     return ""
                 return self._format_balance(acc.id if not node.is_virtual else None)
@@ -280,6 +282,28 @@ class AccountTreeModel(QAbstractItemModel):
             self._id_to_node[acc.id] = node
         self.dataChanged.emit(index, index, [role])
         return True
+
+    def supportedDropActions(self):
+        return Qt.DropAction.MoveAction
+
+    def mimeTypes(self) -> list[str]:
+        return ["application/x-chaoscash-account"]
+
+    def mimeData(self, indexes):
+        from PyQt6.QtCore import QMimeData, QByteArray
+        ids = []
+        for idx in indexes:
+            if idx.column() == 0 and idx.isValid():
+                node = self.get_node(idx)
+                if node and node.account and not node.is_virtual:
+                    ids.append(str(node.account.id))
+        mime = QMimeData()
+        mime.setData("application/x-chaoscash-account", QByteArray(",".join(ids).encode()))
+        return mime
+
+    def dropMimeData(self, data, action, row, col, parent) -> bool:
+        # Actual drop handling is in AccountTreeView.dropEvent
+        return False
 
     def get_node_by_account_id(self, account_id: int) -> AccountNode | None:
         return self._id_to_node.get(account_id)
