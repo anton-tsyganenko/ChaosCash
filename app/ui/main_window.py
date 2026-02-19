@@ -203,23 +203,53 @@ class MainWindow(QMainWindow):
         )
         self.account_tree.setModel(self.account_model)
         self.account_tree.expandAll()
-        self.account_tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        hdr = self.account_tree.header()
+        hdr.setStretchLastSection(False)
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        hdr.resizeSection(0, 200)
+        hdr.resizeSection(1, 120)
+        hdr.resizeSection(2, 70)
 
         # Transaction model
         self.trans_model = TransactionModel(
             self.trans_repo, self.currency_repo, self.settings
         )
         self.transaction_view.setModel(self.trans_model)
-        self.transaction_view.horizontalHeader().setSectionResizeMode(
-            2, QHeaderView.ResizeMode.Stretch)
+        th = self.transaction_view.horizontalHeader()
+        th.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        # Auto-size date column to fit the configured date format
+        try:
+            fmt = self.settings.date_format
+            fmt = fmt.replace("yyyy", "%Y").replace("MM", "%m").replace("dd", "%d")
+            fmt = fmt.replace("HH", "%H").replace("mm", "%M").replace("ss", "%S")
+            sample = datetime.now().strftime(fmt)
+            date_width = self.transaction_view.fontMetrics().horizontalAdvance(sample) + 20
+        except Exception:
+            date_width = 150
+        th.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        th.resizeSection(1, date_width)
 
         # Split model
         self.split_model = SplitModel(
             self.split_repo, self.account_repo, self.currency_repo, self.settings
         )
         self.split_view.setModel(self.split_model)
-        self.split_view.horizontalHeader().setSectionResizeMode(
-            2, QHeaderView.ResizeMode.Stretch)
+        sh = self.split_view.horizontalHeader()
+        sh.setStretchLastSection(False)
+        # Description (col 1) gets all the extra space
+        sh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        sh.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        sh.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
+        sh.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
+        sh.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
+        sh.setSectionResizeMode(5, QHeaderView.ResizeMode.Interactive)
+        sh.resizeSection(0, 80)   # Ext. ID
+        sh.resizeSection(2, 150)  # Account
+        sh.resizeSection(3, 50)   # Fixed
+        sh.resizeSection(4, 100)  # Amount
+        sh.resizeSection(5, 70)   # Currency
 
     def _setup_delegates(self):
         # Transaction view delegates
