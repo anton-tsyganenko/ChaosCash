@@ -35,7 +35,11 @@ class AccountTreeView(QTreeView):
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
         self.clicked.connect(self._on_clicked)
-        self.selectionModel().selectionChanged.connect(self._on_selection_changed)
+
+    def setModel(self, model):
+        super().setModel(model)
+        if model is not None:
+            self.selectionModel().selectionChanged.connect(self._on_selection_changed)
 
     def _on_clicked(self, index: QModelIndex):
         model: AccountTreeModel = self.model()
