@@ -2,8 +2,8 @@
 import sqlite3
 import os
 from PyQt6.QtWidgets import (
-    QMainWindow, QSplitter, QVBoxLayout, QHBoxLayout, QWidget, QHeaderView,
-    QFileDialog, QMessageBox, QApplication, QMenu, QPushButton
+    QMainWindow, QSplitter, QVBoxLayout, QWidget, QHeaderView,
+    QFileDialog, QMessageBox, QApplication, QMenu
 )
 from PyQt6.QtCore import Qt, QModelIndex, QTimer
 from PyQt6.QtGui import QAction
@@ -21,7 +21,9 @@ from app.services.transaction_service import TransactionService
 from app.services.integrity_service import IntegrityService
 from app.ui.item_models.account_tree_model import AccountTreeModel
 from app.ui.item_models.transaction_model import TransactionModel
-from app.ui.item_models.split_model import SplitModel, ROW_PHANTOM
+from app.ui.item_models.split_model import (
+    SplitModel, ROW_PHANTOM, COL_ACCOUNT, COL_AMOUNT, COL_CURRENCY
+)
 from app.ui.widgets.account_tree_view import AccountTreeView
 from app.ui.widgets.transaction_view import TransactionView
 from app.ui.widgets.split_view import SplitView
@@ -65,6 +67,11 @@ class MainWindow(QMainWindow):
         self._current_trans_id: int | None = None
         self._virtual_mode: int | None = None  # VIRTUAL_IMBALANCE_ID or VIRTUAL_EMPTY_ID
 
+        # New-transaction entry flow state
+        self._new_trans_entry_mode: bool = False
+        # (row, col) to focus in split view after next split_model.load(); row=-1 means last
+        self._post_reload_focus: tuple[int, int] | None = None
+
         self._setup_ui()
         self._setup_menu()
         self._setup_models()
@@ -96,14 +103,6 @@ class MainWindow(QMainWindow):
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(0, 0, 0, 0)
-
-        # Toolbar above transaction list
-        trans_toolbar = QHBoxLayout()
-        self.btn_add_trans = QPushButton(tr("+ New Transaction"))
-        self.btn_add_trans.clicked.connect(self._add_transaction)
-        trans_toolbar.addWidget(self.btn_add_trans)
-        trans_toolbar.addStretch()
-        right_layout.addLayout(trans_toolbar)
 
         self.right_splitter = QSplitter(Qt.Orientation.Vertical)
 
@@ -147,11 +146,6 @@ class MainWindow(QMainWindow):
         add_acc_action = QAction(tr("&Add Account"), self)
         add_acc_action.triggered.connect(lambda: self.account_tree._add_account(QModelIndex()))
         file_menu.addAction(add_acc_action)
-
-        add_trans_action = QAction(tr("&New Transaction"), self)
-        add_trans_action.setShortcut("Ctrl+T")
-        add_trans_action.triggered.connect(self._add_transaction)
-        file_menu.addAction(add_trans_action)
 
         file_menu.addSeparator()
 
@@ -249,18 +243,83 @@ class MainWindow(QMainWindow):
         self.transaction_view.transactions_changed.connect(self._on_transactions_changed)
         self.split_view.split_changed.connect(self._on_split_changed)
 
-        # React to model data changes in split view for inline edits
+        # React to model data changes
         self.split_model.dataChanged.connect(self._on_split_data_changed)
         self.trans_model.dataChanged.connect(self._on_trans_data_changed)
+        self.trans_model.new_transaction_requested.connect(self._on_new_transaction_requested)
+
+    # --- New transaction entry flow ---
+
+    def _on_new_transaction_requested(self, description: str, date: str):
+        """Called when user commits description in the phantom transaction row."""
+        if not self._selected_account_ids:
+            return
+        active_account_id = self._selected_account_ids[0]
+
+        # Get last used currency for this account, fall back to first available
+        cur_id = self.split_repo.get_last_currency_for_account(active_account_id)
+        if cur_id is None:
+            currencies = self.currency_repo.get_all()
+            if not currencies:
+                return
+            cur_id = currencies[0].id
+
+        # Create transaction
+        trans_id = self.trans_service.create_transaction(description, date)
+        self._current_trans_id = trans_id
+
+        # Create first split on the active account with amount=0 (user will fill it)
+        self.trans_service.add_split(
+            trans_id, active_account_id, cur_id, amount=0, amount_fixed=False
+        )
+
+        self._new_trans_entry_mode = True
+        # After reload focus: row 0 (first real split), col COL_AMOUNT
+        self._post_reload_focus = (0, COL_AMOUNT)
+
+        # Load split panel and refresh transaction list
+        self.split_model.load(trans_id)
+        if self._selected_account_ids:
+            self.trans_model.load(self._selected_account_ids)
+            row = self.trans_model.find_row_for_trans(trans_id)
+            if row >= 0:
+                self.transaction_view.setCurrentIndex(self.trans_model.index(row, 0))
+
+        self.balance_service.clear()
+        self._refresh_integrity()
+
+        # Focus the amount cell of the first split
+        QTimer.singleShot(0, lambda: self._focus_split_cell(0, COL_AMOUNT))
+
+    def _focus_split_cell(self, row: int, col: int):
+        """Focus and start editing a cell in the split view.
+        row=-1 means: search for the first phantom row."""
+        if row == -1:
+            row = -1
+            for i in range(self.split_model.rowCount()):
+                if self.split_model.get_row_type(i) == ROW_PHANTOM:
+                    row = i
+                    break
+            if row == -1:
+                self._new_trans_entry_mode = False
+                return
+        idx = self.split_model.index(row, col)
+        if idx.isValid() and (self.split_model.flags(idx) & Qt.ItemFlag.ItemIsEditable):
+            self.split_view.setCurrentIndex(idx)
+            self.split_view.edit(idx)
 
     # --- Slots ---
 
     def _on_accounts_selected(self, account_ids: list[int]):
+        self._new_trans_entry_mode = False
+        self._post_reload_focus = None
         self._selected_account_ids = account_ids
         self._virtual_mode = None
         self._load_transactions()
 
     def _on_virtual_node_selected(self, virtual_id: int):
+        self._new_trans_entry_mode = False
+        self._post_reload_focus = None
         self._virtual_mode = virtual_id
         self._load_virtual_transactions(virtual_id)
 
@@ -278,19 +337,20 @@ class MainWindow(QMainWindow):
             trans_ids = [t.id for t in empty]
         else:
             trans_ids = []
-        # Use verbose mode with all accounts for these trans
-        # Simple approach: load all splits for these trans and show them
         self.trans_model.load([])
         self.split_model.load(None)
 
     def _on_transaction_selected(self, trans_id: int):
+        self._new_trans_entry_mode = False
+        self._post_reload_focus = None
         self._current_trans_id = trans_id
         self.split_model.load(trans_id)
-        # Update zero split highlighting
         zero_ids = set(self.integrity_service.get_zero_split_ids())
         self.split_model.set_zero_split_ids(zero_ids)
 
     def _on_transactions_changed(self):
+        self._new_trans_entry_mode = False
+        self._post_reload_focus = None
         self.balance_service.clear()
         self._refresh_integrity()
         self._load_transactions()
@@ -302,16 +362,27 @@ class MainWindow(QMainWindow):
             self.split_model.load(self._current_trans_id)
         if self._selected_account_ids:
             self.trans_model.load(self._selected_account_ids)
+            # Re-select current transaction after model reload
+            if self._current_trans_id:
+                row = self.trans_model.find_row_for_trans(self._current_trans_id)
+                if row >= 0:
+                    self.transaction_view.setCurrentIndex(
+                        self.trans_model.index(row, 0))
         self.account_model.reload()
         self.account_tree.expandAll()
 
+        # Apply deferred split cell focus for new-transaction entry flow
+        if self._post_reload_focus is not None:
+            r, c = self._post_reload_focus
+            self._post_reload_focus = None
+            QTimer.singleShot(0, lambda row=r, col=c: self._focus_split_cell(row, col))
+
     def _on_trans_data_changed(self, top_left: QModelIndex, bottom_right: QModelIndex, roles):
-        """Handle inline edits in transaction table."""
+        """Handle inline edits in transaction table (real rows only)."""
         row = top_left.row()
         trans_id = self.trans_model.get_trans_id(row)
         if trans_id is None:
             return
-        # Get date and description from model
         date_val = self.trans_model.index(row, 1).data()
         desc_val = self.trans_model.index(row, 2).data()
         if date_val and desc_val is not None:
@@ -328,15 +399,18 @@ class MainWindow(QMainWindow):
         split = model.get_split(row)
 
         if row_type == ROW_PHANTOM:
-            # User selected account for phantom row -> create new split
-            acc_id = model.index(row, 2).data(Qt.ItemDataRole.UserRole)
-            cur_id, amount = model.get_phantom_info(row)
-            if acc_id and cur_id and self._current_trans_id:
-                self.trans_service.add_split(
-                    self._current_trans_id, acc_id, cur_id,
-                    amount=amount, amount_fixed=True
-                )
-                QTimer.singleShot(0, self._on_split_changed)
+            if col == COL_ACCOUNT:
+                acc_id = model.index(row, COL_ACCOUNT).data(Qt.ItemDataRole.UserRole)
+                cur_id, amount = model.get_phantom_info(row)
+                if acc_id and cur_id and self._current_trans_id:
+                    self.trans_service.add_split(
+                        self._current_trans_id, acc_id, cur_id,
+                        amount=amount, amount_fixed=True
+                    )
+                    if self._new_trans_entry_mode:
+                        self._post_reload_focus = (1, COL_AMOUNT)
+                        self._new_trans_entry_mode = False
+                    QTimer.singleShot(0, self._on_split_changed)
             return
 
         if split is None:
@@ -345,13 +419,13 @@ class MainWindow(QMainWindow):
         # Gather current values from model
         ext_id = model.index(row, 0).data() or None
         desc = model.index(row, 1).data() or None
-        acc_id = model.index(row, 2).data(Qt.ItemDataRole.UserRole) or split.account
-        amount_str = model.index(row, 4).data() or "0"
-        cur_id = model.index(row, 5).data(Qt.ItemDataRole.UserRole) or split.currency
+        acc_id = model.index(row, COL_ACCOUNT).data(Qt.ItemDataRole.UserRole) or split.account
+        amount_str = model.index(row, COL_AMOUNT).data() or "0"
+        cur_id = model.index(row, COL_CURRENCY).data(Qt.ItemDataRole.UserRole) or split.currency
 
-        from PyQt6.QtCore import Qt as QtCore
         fixed_state = model.index(row, 3).data(Qt.ItemDataRole.CheckStateRole)
-        amount_fixed = fixed_state == Qt.CheckState.Checked if fixed_state is not None else split.amount_fixed
+        amount_fixed = (fixed_state == Qt.CheckState.Checked
+                        if fixed_state is not None else split.amount_fixed)
 
         # Parse amount
         try:
@@ -364,8 +438,7 @@ class MainWindow(QMainWindow):
         denom = cur.denominator if cur else 100
         amount_quants = float_to_quants(amount_float, denom)
 
-        # If amount was manually edited, mark as fixed
-        if col == 4:
+        if col == COL_AMOUNT:
             amount_fixed = True
 
         self.trans_service.update_split(
@@ -373,26 +446,20 @@ class MainWindow(QMainWindow):
         )
 
         # Proportional recalculation when amount changes
-        if col == 4 and self._current_trans_id:
+        if col == COL_AMOUNT and self._current_trans_id:
             self.trans_service.recalculate_flexible_splits(
                 split.id, amount_quants, cur_id, self._current_trans_id
             )
 
-        QTimer.singleShot(0, self._on_split_changed)
+        # New-transaction entry flow: advance focus after each step
+        if self._new_trans_entry_mode:
+            if col == COL_AMOUNT:
+                self._post_reload_focus = (row, COL_CURRENCY)
+            elif col == COL_CURRENCY:
+                # After currency is set → focus phantom counter-split account
+                self._post_reload_focus = (-1, COL_ACCOUNT)
 
-    def _add_transaction(self):
-        now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
-        trans_id = self.trans_service.create_transaction(None, now)
-        self._current_trans_id = trans_id
-        self.split_model.load(trans_id)
-        # Reload transaction list and try to select the new transaction
-        if self._selected_account_ids:
-            self.trans_model.load(self._selected_account_ids)
-            row = self.trans_model.find_row_for_trans(trans_id)
-            if row >= 0:
-                idx = self.trans_model.index(row, 0)
-                self.transaction_view.setCurrentIndex(idx)
-        self._refresh_integrity()
+        QTimer.singleShot(0, self._on_split_changed)
 
     def _toggle_show_hidden(self, checked: bool):
         self.settings.show_hidden_accounts = checked
@@ -449,7 +516,6 @@ class MainWindow(QMainWindow):
             self._open_file_path(path)
 
     def _open_file_path(self, path: str):
-        # Check if already open in another window
         app = QApplication.instance()
         for widget in app.topLevelWidgets():
             if isinstance(widget, MainWindow) and widget.db_path == path and widget is not self:
@@ -459,7 +525,6 @@ class MainWindow(QMainWindow):
                 )
                 widget.raise_()
                 return
-        # Open in new window
         new_window = MainWindow(path, self.settings)
         new_window.show()
 
@@ -471,7 +536,6 @@ class MainWindow(QMainWindow):
     def _open_settings(self):
         dlg = SettingsDialog(self.settings, self)
         if dlg.exec():
-            # Reload everything
             self.account_model.reload()
             self.account_tree.expandAll()
             if self._selected_account_ids:

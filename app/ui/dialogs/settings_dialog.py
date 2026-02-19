@@ -26,9 +26,8 @@ class SettingsDialog(QDialog):
         self.date_format = QLineEdit(self.settings.date_format)
         form.addRow(tr("Date format:"), self.date_format)
 
-        self.decimal_sep = QComboBox()
-        self.decimal_sep.addItems([".", ","])
-        self.decimal_sep.setCurrentText(self.settings.decimal_sep)
+        self.decimal_sep = QLineEdit(self.settings.decimal_sep)
+        self.decimal_sep.setMaxLength(2)
         form.addRow(tr("Decimal separator:"), self.decimal_sep)
 
         self.thousands_sep = QLineEdit(self.settings.thousands_sep)
@@ -64,7 +63,7 @@ class SettingsDialog(QDialog):
 
     def _save_and_accept(self):
         self.settings.set("date_format", self.date_format.text())
-        self.settings.set("decimal_sep", self.decimal_sep.currentText())
+        self.settings.set("decimal_sep", self.decimal_sep.text() or ".")
         sep = self.thousands_sep.text()
         self.settings.set("thousands_sep", sep)
         self.settings.set("show_thousands", bool(sep))

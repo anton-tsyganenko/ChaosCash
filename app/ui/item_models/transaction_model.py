@@ -1,6 +1,7 @@
 """QAbstractTableModel for the transaction list with running balance."""
 from __future__ import annotations
-from PyQt6.QtCore import Qt, QModelIndex, QAbstractTableModel
+from PyQt6.QtCore import Qt, QModelIndex, QAbstractTableModel, pyqtSignal, QTimer
+from PyQt6.QtGui import QColor
 from app.repositories.transaction_repo import TransactionRepo
 from app.repositories.currency_repo import CurrencyRepo
 from app.utils.amount_math import format_amount
@@ -27,7 +28,10 @@ class TransactionModel(QAbstractTableModel):
     Displays transactions for selected accounts.
     Supports verbose (per-split) and summary (per-transaction) modes.
     Implements canFetchMore/fetchMore for lazy loading.
+    Last row is always a phantom (empty) row for entering new transactions.
     """
+
+    new_transaction_requested = pyqtSignal(str, str)  # description, utc_date
 
     def __init__(self, trans_repo: TransactionRepo, currency_repo: CurrencyRepo,
                  settings, parent=None):
@@ -81,7 +85,8 @@ class TransactionModel(QAbstractTableModel):
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.isValid():
             return 0
-        return len(self._rows)
+        # +1 for phantom entry row when accounts are loaded
+        return len(self._rows) + (1 if self._account_ids else 0)
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         return NUM_COLS
@@ -92,6 +97,20 @@ class TransactionModel(QAbstractTableModel):
             return [tr("ID"), tr("Date"), tr("Description"),
                     tr("Amount"), tr("Balance"), tr("Currency")][section]
         return None
+
+    def _is_phantom_row(self, row: int) -> bool:
+        return bool(self._account_ids) and row == len(self._rows)
+
+    def _phantom_date(self) -> str:
+        """Current local time formatted per settings."""
+        try:
+            fmt = self.settings.date_format
+            fmt = fmt.replace("yyyy", "%Y").replace("MM", "%m").replace("dd", "%d")
+            fmt = fmt.replace("HH", "%H").replace("mm", "%M").replace("ss", "%S")
+            tz = self._local_tz or UTC
+            return datetime.now(tz).strftime(fmt)
+        except Exception:
+            return datetime.now().strftime("%Y-%m-%d")
 
     def _format_date(self, utc_str: str) -> str:
         if not utc_str:
@@ -116,10 +135,24 @@ class TransactionModel(QAbstractTableModel):
         )
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
-        if not index.isValid() or index.row() >= len(self._rows):
+        if not index.isValid() or index.row() >= self.rowCount():
             return None
-        row = self._rows[index.row()]
         col = index.column()
+
+        # Phantom entry row
+        if self._is_phantom_row(index.row()):
+            if role == Qt.ItemDataRole.DisplayRole:
+                if col == COL_DATE:
+                    return self._phantom_date()
+                return ""
+            if role == Qt.ItemDataRole.ForegroundRole:
+                return QColor(160, 160, 160)
+            if role == Qt.ItemDataRole.EditRole:
+                if col == COL_DESC:
+                    return ""
+            return None
+
+        row = self._rows[index.row()]
 
         if role == Qt.ItemDataRole.DisplayRole:
             if col == COL_ID:
@@ -129,7 +162,6 @@ class TransactionModel(QAbstractTableModel):
             elif col == COL_DESC:
                 return row.get("Description") or ""
             elif col == COL_AMOUNT:
-                # verbose uses "Amount", summary uses "TotalAmount"
                 amt = row.get("Amount") if "Amount" in row else row.get("TotalAmount")
                 denom = row.get("Denominator", 100)
                 return self._format_amt(amt, denom)
@@ -150,10 +182,31 @@ class TransactionModel(QAbstractTableModel):
 
         return None
 
+    def flags(self, index: QModelIndex) -> Qt.ItemFlag:
+        if not index.isValid():
+            return Qt.ItemFlag.NoItemFlags
+        base = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+        if self._is_phantom_row(index.row()):
+            if index.column() == COL_DESC:
+                return base | Qt.ItemFlag.ItemIsEditable
+            return base
+        return base
+
+    def setData(self, index: QModelIndex, value, role: int = Qt.ItemDataRole.EditRole) -> bool:
+        if not index.isValid() or role != Qt.ItemDataRole.EditRole:
+            return False
+        if self._is_phantom_row(index.row()) and index.column() == COL_DESC:
+            desc = str(value).strip()
+            if desc:
+                now_utc = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
+                QTimer.singleShot(0, lambda d=desc, t=now_utc: self.new_transaction_requested.emit(d, t))
+            return True
+        return False
+
     def get_trans_id(self, row: int) -> int | None:
         if 0 <= row < len(self._rows):
             return self._rows[row].get("ID")
-        return None
+        return None  # phantom row or out of bounds
 
     def find_row_for_trans(self, trans_id: int) -> int:
         for i, row in enumerate(self._rows):
