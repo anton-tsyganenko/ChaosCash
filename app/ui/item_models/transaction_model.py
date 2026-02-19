@@ -71,6 +71,33 @@ class TransactionModel(QAbstractTableModel):
         self._rows = raw[:FETCH_BLOCK]
         self.endResetModel()
 
+    def load_by_ids(self, trans_ids: list[int]) -> None:
+        """Load specific transactions by ID (for virtual nodes: imbalance, empty)."""
+        self.beginResetModel()
+        self._account_ids = []  # no phantom row for virtual node views
+        self._currencies = {c.id: c for c in self.currency_repo.get_all()}
+        try:
+            import datetime as dt
+            self._local_tz = dt.datetime.now().astimezone().tzinfo
+        except Exception:
+            self._local_tz = UTC
+
+        if not trans_ids:
+            self._all_rows = []
+            self._rows = []
+            self.endResetModel()
+            return
+
+        mode = self.settings.transaction_view_mode
+        if mode == "verbose":
+            raw = self.trans_repo.get_verbose_by_ids(trans_ids)
+        else:
+            raw = self.trans_repo.get_summary_by_ids(trans_ids)
+
+        self._all_rows = raw
+        self._rows = raw[:FETCH_BLOCK]
+        self.endResetModel()
+
     def canFetchMore(self, parent: QModelIndex = QModelIndex()) -> bool:
         return len(self._rows) < len(self._all_rows)
 

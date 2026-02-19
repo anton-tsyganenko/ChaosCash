@@ -65,6 +65,48 @@ LEFT JOIN Split S ON T.ID = S.Trans
 WHERE S.ID IS NULL
 """
 
+GET_VERBOSE_BY_IDS = """
+SELECT
+    T.ID,
+    T.Date,
+    T.Description,
+    S.ID AS SplitID,
+    S.Amount,
+    SUM(S.Amount) OVER (PARTITION BY S.Account, S.Currency ORDER BY T.Date, T.ID, S.ID) AS Balance,
+    C.Code AS CurrencyCode,
+    C.Denominator,
+    S.Account AS AccountID
+FROM Trans AS T
+LEFT JOIN Split AS S ON T.ID = S.Trans
+LEFT JOIN Currency AS C ON S.Currency = C.ID
+WHERE T.ID IN ({placeholders})
+ORDER BY T.Date ASC, T.ID ASC, S.ID ASC
+"""
+
+GET_SUMMARY_BY_IDS = """
+WITH q AS (
+    SELECT
+        T.ID,
+        T.Date,
+        T.Description,
+        SUM(S.Amount) AS TotalAmount,
+        S.Currency,
+        C.Code AS CurrencyCode,
+        C.Denominator
+    FROM Trans AS T
+    LEFT JOIN Split AS S ON T.ID = S.Trans
+    LEFT JOIN Currency AS C ON S.Currency = C.ID
+    WHERE T.ID IN ({placeholders})
+    GROUP BY T.ID, S.Currency
+)
+SELECT
+    ID, Date, Description, TotalAmount,
+    SUM(TotalAmount) OVER (PARTITION BY Currency ORDER BY Date, ID) AS Balance,
+    CurrencyCode, Denominator, Currency
+FROM q
+ORDER BY Date ASC, ID ASC
+"""
+
 GET_AUTOCOMPLETE = """
 SELECT DISTINCT T.ID, T.Date, T.Description
 FROM Trans T

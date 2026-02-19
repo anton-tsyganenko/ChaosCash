@@ -48,6 +48,22 @@ class TransactionRepo:
         rows = self.conn.execute(sql, account_ids).fetchall()
         return [dict(r) for r in rows]
 
+    def get_verbose_by_ids(self, trans_ids: list[int]) -> list[dict]:
+        if not trans_ids:
+            return []
+        placeholders = ",".join("?" * len(trans_ids))
+        sql = Q.GET_VERBOSE_BY_IDS.format(placeholders=placeholders)
+        rows = self.conn.execute(sql, trans_ids).fetchall()
+        return [dict(r) for r in rows]
+
+    def get_summary_by_ids(self, trans_ids: list[int]) -> list[dict]:
+        if not trans_ids:
+            return []
+        placeholders = ",".join("?" * len(trans_ids))
+        sql = Q.GET_SUMMARY_BY_IDS.format(placeholders=placeholders)
+        rows = self.conn.execute(sql, trans_ids).fetchall()
+        return [dict(r) for r in rows]
+
     def get_imbalanced(self) -> list[dict]:
         rows = self.conn.execute(Q.GET_IMBALANCED).fetchall()
         return [dict(r) for r in rows]

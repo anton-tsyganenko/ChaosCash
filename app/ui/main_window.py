@@ -367,8 +367,9 @@ class MainWindow(QMainWindow):
             trans_ids = [t.id for t in empty]
         else:
             trans_ids = []
-        self.trans_model.load([])
+        self.trans_model.load_by_ids(trans_ids)
         self.split_model.load(None)
+        self._current_trans_id = None
 
     def _on_transaction_selected(self, trans_id: int):
         self._new_trans_entry_mode = False
@@ -390,7 +391,9 @@ class MainWindow(QMainWindow):
         self._refresh_integrity()
         if self._current_trans_id:
             self.split_model.load(self._current_trans_id)
-        if self._selected_account_ids:
+        if self._virtual_mode is not None:
+            self._load_virtual_transactions(self._virtual_mode)
+        elif self._selected_account_ids:
             self.trans_model.load(self._selected_account_ids)
             # Re-select current transaction after model reload
             if self._current_trans_id:
