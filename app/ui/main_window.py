@@ -421,6 +421,9 @@ class MainWindow(QMainWindow):
 
     def _on_split_data_changed(self, top_left: QModelIndex, bottom_right: QModelIndex, roles):
         """Handle inline edits in split table."""
+        # Ignore display-only role updates (e.g. BackgroundRole from set_zero_split_ids)
+        if roles and Qt.ItemDataRole.EditRole not in roles and Qt.ItemDataRole.CheckStateRole not in roles:
+            return
         row = top_left.row()
         col = top_left.column()
         model = self.split_model
@@ -462,7 +465,7 @@ class MainWindow(QMainWindow):
             from app.utils.expression_parser import safe_eval
             amount_float = safe_eval(amount_str)
         except ValueError:
-            amount_float = parse_amount(amount_str, self.settings.decimal_sep) or 0.0
+            amount_float = parse_amount(amount_str, self.settings.decimal_sep, self.settings.thousands_sep) or 0.0
 
         cur = self.currency_repo.get_by_id(cur_id)
         denom = cur.denominator if cur else 100
