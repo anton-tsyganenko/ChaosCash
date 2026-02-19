@@ -20,6 +20,7 @@ NUM_COLS = 6
 # Sentinel row type
 ROW_REAL = "real"
 ROW_PHANTOM = "phantom"
+ROW_NEW = "new"
 
 
 class SplitRow:
@@ -85,6 +86,8 @@ class SplitModel(QAbstractTableModel):
                 self._rows.append(SplitRow(
                     None, ROW_PHANTOM, cid, -total
                 ))
+        # Always add an empty row for creating new splits from scratch
+        self._rows.append(SplitRow(None, ROW_NEW))
 
     def set_zero_split_ids(self, ids: set[int]) -> None:
         self._zero_split_ids = ids
@@ -170,6 +173,10 @@ class SplitModel(QAbstractTableModel):
                 elif col == COL_DESC:
                     return tr("(imbalance — select account)")
                 return ""
+            if row_obj.row_type == ROW_NEW:
+                if col == COL_DESC:
+                    return tr("(new split — fill account, amount, currency)")
+                return ""
             s = row_obj.split
             if col == COL_EXTID:
                 return s.external_id or ""
@@ -214,9 +221,15 @@ class SplitModel(QAbstractTableModel):
                     return s.id  # row identity
             return None  # phantom row
 
+        elif role == Qt.ItemDataRole.ForegroundRole:
+            if row_obj.row_type in (ROW_PHANTOM, ROW_NEW):
+                return QColor(140, 140, 140)
+
         elif role == Qt.ItemDataRole.BackgroundRole:
             if row_obj.row_type == ROW_PHANTOM:
                 return QColor(255, 230, 180)
+            if row_obj.row_type == ROW_NEW:
+                return QColor(230, 240, 255)
             if row_obj.row_type == ROW_REAL and row_obj.split:
                 if row_obj.split.id in self._zero_split_ids:
                     return QColor(255, 255, 180)
@@ -246,6 +259,10 @@ class SplitModel(QAbstractTableModel):
         base = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
         if row_obj.row_type == ROW_PHANTOM:
             if index.column() == COL_ACCOUNT:
+                return base | Qt.ItemFlag.ItemIsEditable
+            return base
+        if row_obj.row_type == ROW_NEW:
+            if index.column() in (COL_ACCOUNT, COL_AMOUNT, COL_CURRENCY):
                 return base | Qt.ItemFlag.ItemIsEditable
             return base
         # Real row

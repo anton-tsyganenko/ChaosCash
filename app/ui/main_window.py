@@ -22,7 +22,7 @@ from app.services.integrity_service import IntegrityService
 from app.ui.item_models.account_tree_model import AccountTreeModel
 from app.ui.item_models.transaction_model import TransactionModel
 from app.ui.item_models.split_model import (
-    SplitModel, ROW_PHANTOM, COL_ACCOUNT, COL_AMOUNT, COL_CURRENCY
+    SplitModel, ROW_PHANTOM, ROW_NEW, COL_ACCOUNT, COL_AMOUNT, COL_CURRENCY
 )
 from app.ui.widgets.account_tree_view import AccountTreeView
 from app.ui.widgets.transaction_view import TransactionView
@@ -425,7 +425,9 @@ class MainWindow(QMainWindow):
     def _on_split_data_changed(self, top_left: QModelIndex, bottom_right: QModelIndex, roles):
         """Handle inline edits in split table."""
         # Ignore display-only role updates (e.g. BackgroundRole from set_zero_split_ids)
-        if roles and Qt.ItemDataRole.EditRole not in roles and Qt.ItemDataRole.CheckStateRole not in roles:
+        if roles and Qt.ItemDataRole.EditRole not in roles \
+                and Qt.ItemDataRole.CheckStateRole not in roles \
+                and Qt.ItemDataRole.UserRole not in roles:
             return
         row = top_left.row()
         col = top_left.column()
@@ -446,6 +448,27 @@ class MainWindow(QMainWindow):
                     if self._new_trans_entry_mode:
                         self._post_reload_focus = (1, COL_AMOUNT)
                         self._new_trans_entry_mode = False
+                    QTimer.singleShot(0, self._on_split_changed)
+            return
+
+        if row_type == ROW_NEW:
+            acc_id = model.index(row, COL_ACCOUNT).data(Qt.ItemDataRole.UserRole)
+            cur_id = model.index(row, COL_CURRENCY).data(Qt.ItemDataRole.UserRole)
+            amount_str = model.index(row, COL_AMOUNT).data(Qt.ItemDataRole.EditRole) or ""
+            if acc_id and cur_id and amount_str and amount_str != "0" and self._current_trans_id:
+                try:
+                    from app.utils.expression_parser import safe_eval
+                    amount_float = safe_eval(amount_str)
+                except Exception:
+                    amount_float = 0.0
+                cur = self.currency_repo.get_by_id(cur_id)
+                denom = cur.denominator if cur else 100
+                amount_quants = float_to_quants(amount_float, denom)
+                if amount_quants != 0:
+                    self.trans_service.add_split(
+                        self._current_trans_id, acc_id, cur_id,
+                        amount=amount_quants, amount_fixed=True
+                    )
                     QTimer.singleShot(0, self._on_split_changed)
             return
 
