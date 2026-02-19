@@ -52,10 +52,13 @@ class SplitModel(QAbstractTableModel):
         self._accounts: dict[int, object] = {}
         self._currencies: dict[int, object] = {}
         self._zero_split_ids: set[int] = set()
+        # Pending in-memory edits before model reload: (row, col) -> {role: value}
+        self._cell_overrides: dict[tuple[int, int], dict] = {}
 
     def load(self, trans_id: int | None) -> None:
         self.beginResetModel()
         self._trans_id = trans_id
+        self._cell_overrides = {}
         self._accounts = {a.id: a for a in self.account_repo.get_all()}
         self._currencies = {c.id: c for c in self.currency_repo.get_all()}
 
@@ -146,19 +149,28 @@ class SplitModel(QAbstractTableModel):
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or index.row() >= len(self._rows):
             return None
-        row = self._rows[index.row()]
+        row_obj = self._rows[index.row()]
         col = index.column()
 
+        # Check pending in-memory overrides first (set by delegates via setData)
+        override = self._cell_overrides.get((index.row(), col))
+        if override is not None:
+            if role in override:
+                return override[role]
+            # DisplayRole falls back to EditRole if DisplayRole not stored
+            if role == Qt.ItemDataRole.DisplayRole and Qt.ItemDataRole.EditRole in override:
+                return override[Qt.ItemDataRole.EditRole]
+
         if role == Qt.ItemDataRole.DisplayRole:
-            if row.row_type == ROW_PHANTOM:
+            if row_obj.row_type == ROW_PHANTOM:
                 if col == COL_AMOUNT:
-                    return self._format_amt(row.phantom_amount, row.phantom_currency_id)
+                    return self._format_amt(row_obj.phantom_amount, row_obj.phantom_currency_id)
                 elif col == COL_CURRENCY:
-                    return self._currency_code(row.phantom_currency_id)
+                    return self._currency_code(row_obj.phantom_currency_id)
                 elif col == COL_DESC:
                     return tr("(imbalance — select account)")
                 return ""
-            s = row.split
+            s = row_obj.split
             if col == COL_EXTID:
                 return s.external_id or ""
             elif col == COL_DESC:
@@ -171,35 +183,68 @@ class SplitModel(QAbstractTableModel):
                 return self._currency_code(s.currency)
             return None
 
+        elif role == Qt.ItemDataRole.EditRole:
+            if row_obj.row_type == ROW_REAL and row_obj.split:
+                s = row_obj.split
+                if col == COL_EXTID:
+                    return s.external_id or ""
+                elif col == COL_DESC:
+                    return s.description or ""
+                elif col == COL_AMOUNT:
+                    return self._format_amt(s.amount, s.currency)
+            return None
+
         elif role == Qt.ItemDataRole.CheckStateRole:
-            if col == COL_FIXED and row.row_type == ROW_REAL and row.split:
-                return Qt.CheckState.Checked if row.split.amount_fixed else Qt.CheckState.Unchecked
+            if col == COL_FIXED and row_obj.row_type == ROW_REAL and row_obj.split:
+                return Qt.CheckState.Checked if row_obj.split.amount_fixed else Qt.CheckState.Unchecked
 
         elif role == Qt.ItemDataRole.TextAlignmentRole:
             if col == COL_AMOUNT:
                 return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
 
         elif role == Qt.ItemDataRole.UserRole:
-            if row.row_type == ROW_REAL and row.split:
-                return row.split.id
-            if row.row_type == ROW_PHANTOM:
-                return None
+            # Per-column UserRole: account ID, currency ID, or split ID for row identity
+            if row_obj.row_type == ROW_REAL and row_obj.split:
+                s = row_obj.split
+                if col == COL_ACCOUNT:
+                    return s.account
+                elif col == COL_CURRENCY:
+                    return s.currency
+                else:
+                    return s.id  # row identity
+            return None  # phantom row
 
         elif role == Qt.ItemDataRole.BackgroundRole:
-            if row.row_type == ROW_PHANTOM:
+            if row_obj.row_type == ROW_PHANTOM:
                 return QColor(255, 230, 180)
-            if row.row_type == ROW_REAL and row.split:
-                if row.split.id in self._zero_split_ids:
-                    return QColor(255, 255, 180)  # Yellow warning for zero splits
+            if row_obj.row_type == ROW_REAL and row_obj.split:
+                if row_obj.split.id in self._zero_split_ids:
+                    return QColor(255, 255, 180)
 
         return None
+
+    def setData(self, index: QModelIndex, value,
+                role: int = Qt.ItemDataRole.EditRole) -> bool:
+        if not index.isValid() or index.row() >= len(self._rows):
+            return False
+        col = index.column()
+        f = self.flags(index)
+        if not (f & (Qt.ItemFlag.ItemIsEditable | Qt.ItemFlag.ItemIsUserCheckable)):
+            return False
+
+        key = (index.row(), col)
+        if key not in self._cell_overrides:
+            self._cell_overrides[key] = {}
+        self._cell_overrides[key][role] = value
+        self.dataChanged.emit(index, index, [role])
+        return True
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         if not index.isValid():
             return Qt.ItemFlag.NoItemFlags
-        row = self._rows[index.row()]
+        row_obj = self._rows[index.row()]
         base = Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
-        if row.row_type == ROW_PHANTOM:
+        if row_obj.row_type == ROW_PHANTOM:
             if index.column() == COL_ACCOUNT:
                 return base | Qt.ItemFlag.ItemIsEditable
             return base

@@ -17,8 +17,7 @@ class CurrencyComboDelegate(QStyledItemDelegate):
         editor.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         currencies = self.currency_repo.get_all()
         for cur in currencies:
-            label = f"{cur.code}" + (f" — {cur.name}" if cur.name else "")
-            editor.addItem(label, cur.id)
+            editor.addItem(cur.code, cur.id)
         editor.completer().setFilterMode(Qt.MatchFlag.MatchContains)
         editor.completer().setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         return editor
