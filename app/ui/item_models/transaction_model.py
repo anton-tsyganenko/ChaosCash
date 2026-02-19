@@ -172,6 +172,12 @@ class TransactionModel(QAbstractTableModel):
             elif col == COL_CURRENCY:
                 return row.get("CurrencyCode", "")
 
+        elif role == Qt.ItemDataRole.EditRole:
+            if col == COL_DATE:
+                return row.get("Date", "")
+            elif col == COL_DESC:
+                return row.get("Description") or ""
+
         elif role == Qt.ItemDataRole.TextAlignmentRole:
             if col in (COL_AMOUNT, COL_BALANCE):
                 return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
@@ -190,6 +196,8 @@ class TransactionModel(QAbstractTableModel):
             if index.column() == COL_DESC:
                 return base | Qt.ItemFlag.ItemIsEditable
             return base
+        if index.column() in (COL_DATE, COL_DESC):
+            return base | Qt.ItemFlag.ItemIsEditable
         return base
 
     def setData(self, index: QModelIndex, value, role: int = Qt.ItemDataRole.EditRole) -> bool:
@@ -201,6 +209,17 @@ class TransactionModel(QAbstractTableModel):
                 now_utc = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S")
                 QTimer.singleShot(0, lambda d=desc, t=now_utc: self.new_transaction_requested.emit(d, t))
             return True
+        row = index.row()
+        if 0 <= row < len(self._rows):
+            col = index.column()
+            if col == COL_DATE:
+                self._rows[row]["Date"] = str(value)
+                self.dataChanged.emit(index, index, [role])
+                return True
+            elif col == COL_DESC:
+                self._rows[row]["Description"] = str(value)
+                self.dataChanged.emit(index, index, [role])
+                return True
         return False
 
     def get_trans_id(self, row: int) -> int | None:

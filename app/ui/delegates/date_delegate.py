@@ -30,7 +30,7 @@ class DateDelegate(QStyledItemDelegate):
         return editor
 
     def setEditorData(self, editor: QDateTimeEdit, index):
-        utc_str = index.data(Qt.ItemDataRole.DisplayRole)
+        utc_str = index.data(Qt.ItemDataRole.EditRole)
         if utc_str:
             try:
                 dt_utc = datetime.strptime(utc_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
@@ -49,7 +49,7 @@ class DateDelegate(QStyledItemDelegate):
                             qt_dt.time().hour(), qt_dt.time().minute(), qt_dt.time().second(),
                             tzinfo=self._local_tz())
         utc_str = local_dt.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
-        model.setData(index, utc_str, Qt.ItemDataRole.DisplayRole)
+        model.setData(index, utc_str, Qt.ItemDataRole.EditRole)
 
     def updateEditorGeometry(self, editor, option, index):
         editor.setGeometry(option.rect)

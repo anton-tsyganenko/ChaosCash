@@ -413,7 +413,7 @@ class MainWindow(QMainWindow):
         trans_id = self.trans_model.get_trans_id(row)
         if trans_id is None:
             return
-        date_val = self.trans_model.index(row, 1).data()
+        date_val = self.trans_model.index(row, 1).data(Qt.ItemDataRole.EditRole)
         desc_val = self.trans_model.index(row, 2).data()
         if date_val and desc_val is not None:
             self.trans_service.update_transaction(trans_id, date_val, desc_val)
