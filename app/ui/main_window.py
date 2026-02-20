@@ -419,17 +419,32 @@ class MainWindow(QMainWindow):
         self.account_model.reload()
         self.account_tree.expandAll()
 
-        # Restore virtual node selection after account_model.reload() wipes it.
-        # Uses selectionModel().select() which emits selectionChanged but does NOT
-        # emit virtual_node_selected (only _on_clicked does), so no re-load occurs.
+        # Restore account tree selection after account_model.reload() wipes it.
+        sel_model = self.account_tree.selectionModel()
         if self._virtual_mode is not None:
+            # Virtual node: selectionChanged fires but _on_selection_changed filters
+            # out virtual nodes, so account_selected is not emitted → no re-load.
             for row in range(self.account_model.rowCount()):
                 idx = self.account_model.index(row, 0)
                 node = self.account_model.get_node(idx)
                 if node and node.is_virtual and node.virtual_id == self._virtual_mode:
-                    self.account_tree.selectionModel().select(
-                        idx, QItemSelectionModel.SelectionFlag.ClearAndSelect)
+                    sel_model.select(idx, QItemSelectionModel.SelectionFlag.ClearAndSelect)
                     break
+        elif self._selected_account_ids:
+            # Regular accounts: block signals to prevent _on_selection_changed from
+            # emitting account_selected, which would re-load transactions and clear splits.
+            sel_model.blockSignals(True)
+            try:
+                first = True
+                for acc_id in self._selected_account_ids:
+                    idx = self.account_model.get_index_for_account(acc_id)
+                    if idx.isValid():
+                        flag = (QItemSelectionModel.SelectionFlag.ClearAndSelect if first
+                                else QItemSelectionModel.SelectionFlag.Select)
+                        sel_model.select(idx, flag)
+                        first = False
+            finally:
+                sel_model.blockSignals(False)
 
         # Apply deferred split cell focus for new-transaction entry flow
         if self._post_reload_focus is not None:
