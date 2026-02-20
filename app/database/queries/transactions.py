@@ -98,6 +98,7 @@ WITH q AS (
     LEFT JOIN Currency AS C ON S.Currency = C.ID
     WHERE T.ID IN ({placeholders})
     GROUP BY T.ID, S.Currency
+    HAVING SUM(S.Amount) <> 0 OR S.Currency IS NULL
 )
 SELECT
     ID, Date, Description, TotalAmount,

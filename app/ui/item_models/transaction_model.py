@@ -88,11 +88,9 @@ class TransactionModel(QAbstractTableModel):
             self.endResetModel()
             return
 
-        mode = self.settings.transaction_view_mode
-        if mode == "verbose":
-            raw = self.trans_repo.get_verbose_by_ids(trans_ids)
-        else:
-            raw = self.trans_repo.get_summary_by_ids(trans_ids)
+        # Virtual views (imbalance, empty) always use summary: one row per
+        # transaction+currency showing the net imbalance.
+        raw = self.trans_repo.get_summary_by_ids(trans_ids)
 
         self._all_rows = raw
         self._rows = raw[:FETCH_BLOCK]
