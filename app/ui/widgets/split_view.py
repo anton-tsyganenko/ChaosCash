@@ -4,7 +4,7 @@ from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex
 from PyQt6.QtGui import QAction
 from app.i18n import tr
 from app.services.transaction_service import TransactionService
-from app.ui.item_models.split_model import SplitModel, ROW_PHANTOM, ROW_REAL
+from app.ui.item_models.split_model import SplitModel, ROW_PHANTOM, ROW_REAL, COL_FIXED
 
 
 class SplitView(QTableView):
@@ -20,6 +20,21 @@ class SplitView(QTableView):
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._show_context_menu)
+
+    def mousePressEvent(self, event):
+        index = self.indexAt(event.pos())
+        if (index.isValid()
+                and index.column() == COL_FIXED
+                and event.button() == Qt.MouseButton.LeftButton):
+            model: SplitModel = self.model()
+            if model and model.get_row_type(index.row()) == ROW_REAL:
+                current = index.data(Qt.ItemDataRole.CheckStateRole)
+                if current is not None:
+                    new_state = (Qt.CheckState.Unchecked
+                                 if current == Qt.CheckState.Checked
+                                 else Qt.CheckState.Checked)
+                    model.setData(index, new_state, Qt.ItemDataRole.CheckStateRole)
+        super().mousePressEvent(event)
 
     def _show_context_menu(self, pos):
         index = self.indexAt(pos)
