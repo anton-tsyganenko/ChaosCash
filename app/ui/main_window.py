@@ -34,7 +34,8 @@ from app.ui.delegates.currency_combo_delegate import CurrencyComboDelegate
 from app.ui.dialogs.settings_dialog import SettingsDialog
 from app.ui.dialogs.currency_editor_dialog import CurrencyEditorDialog
 from app.utils.recent_files import add_recent_file, get_recent_files
-from app.utils.amount_math import float_to_quants, parse_amount
+from app.utils.amount_math import float_to_quants
+from app.utils.expression_parser import safe_eval
 from app.ui.item_models.account_tree_model import VIRTUAL_IMBALANCE_ID, VIRTUAL_EMPTY_ID
 from datetime import datetime, timezone
 
@@ -483,10 +484,9 @@ class MainWindow(QMainWindow):
             amount_str = model.index(row, COL_AMOUNT).data(Qt.ItemDataRole.EditRole) or ""
             if acc_id and cur_id and amount_str and amount_str != "0" and self._current_trans_id:
                 try:
-                    from app.utils.expression_parser import safe_eval
                     amount_float = safe_eval(amount_str)
-                except Exception:
-                    amount_float = 0.0
+                except ValueError:
+                    return
                 cur = self.currency_repo.get_by_id(cur_id)
                 denom = cur.denominator if cur else 100
                 amount_quants = float_to_quants(amount_float, denom)
@@ -522,12 +522,10 @@ class MainWindow(QMainWindow):
         amount_fixed = (fixed_state == Qt.CheckState.Checked
                         if fixed_state is not None else split.amount_fixed)
 
-        # Parse amount
         try:
-            from app.utils.expression_parser import safe_eval
             amount_float = safe_eval(amount_str)
         except ValueError:
-            amount_float = parse_amount(amount_str, self.settings.decimal_sep, self.settings.thousands_sep) or 0.0
+            return
 
         cur = self.currency_repo.get_by_id(cur_id)
         denom = cur.denominator if cur else 100

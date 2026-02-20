@@ -29,18 +29,3 @@ def format_amount(quants: int, denominator: int,
         if decimal_sep != ".":
             formatted = formatted.replace(".", decimal_sep)
     return formatted
-
-
-def parse_amount(text: str, decimal_sep: str = ".", thousands_sep: str = "") -> float | None:
-    """Parse amount string to float. Returns None on failure."""
-    try:
-        cleaned = text.strip()
-        if thousands_sep:
-            cleaned = cleaned.replace(thousands_sep, "")
-        cleaned = cleaned.replace(decimal_sep, ".")
-        # Also accept period as decimal when decimal_sep is comma
-        if decimal_sep == ",":
-            pass  # already replaced
-        return float(cleaned)
-    except (ValueError, AttributeError):
-        return None
