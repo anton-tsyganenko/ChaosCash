@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QSplitter, QVBoxLayout, QWidget, QHeaderView,
     QFileDialog, QMessageBox, QApplication, QMenu
 )
-from PyQt6.QtCore import Qt, QModelIndex, QTimer
+from PyQt6.QtCore import Qt, QModelIndex, QTimer, QItemSelectionModel
 from PyQt6.QtGui import QAction
 
 from app.i18n import tr
@@ -417,6 +417,18 @@ class MainWindow(QMainWindow):
                         self.trans_model.index(row, 0))
         self.account_model.reload()
         self.account_tree.expandAll()
+
+        # Restore virtual node selection after account_model.reload() wipes it.
+        # Uses selectionModel().select() which emits selectionChanged but does NOT
+        # emit virtual_node_selected (only _on_clicked does), so no re-load occurs.
+        if self._virtual_mode is not None:
+            for row in range(self.account_model.rowCount()):
+                idx = self.account_model.index(row, 0)
+                node = self.account_model.get_node(idx)
+                if node and node.is_virtual and node.virtual_id == self._virtual_mode:
+                    self.account_tree.selectionModel().select(
+                        idx, QItemSelectionModel.SelectionFlag.ClearAndSelect)
+                    break
 
         # Apply deferred split cell focus for new-transaction entry flow
         if self._post_reload_focus is not None:
