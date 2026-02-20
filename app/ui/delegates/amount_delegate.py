@@ -29,13 +29,10 @@ class AmountDelegate(QStyledItemDelegate):
             return
         try:
             result = safe_eval(text)
-            # Format result
-            from app.utils.amount_math import format_amount
-            # Store as string for now; conversion happens in service
-            model.setData(index, f"{result}", Qt.ItemDataRole.EditRole)
         except ValueError:
-            # Keep original on parse error
-            pass
+            result = parse_amount(text, self.settings.decimal_sep, self.settings.thousands_sep)
+        if result is not None:
+            model.setData(index, f"{result}", Qt.ItemDataRole.EditRole)
 
     def updateEditorGeometry(self, editor, option, index):
         editor.setGeometry(option.rect)
