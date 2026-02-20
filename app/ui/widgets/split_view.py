@@ -57,5 +57,5 @@ class SplitView(QTableView):
         menu.exec(self.viewport().mapToGlobal(pos))
 
     def _delete_split(self, split_id: int):
-        self.trans_service.delete_split(split_id)
+        self.trans_service.delete_split_and_rebalance(split_id)
         self.split_changed.emit()

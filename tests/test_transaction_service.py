@@ -119,7 +119,7 @@ def test_recalculate_flexible_splits(service, repos):
     s3 = service.add_split(trans_id, acc3, cur_id, amount=-5000, amount_fixed=False)
 
     # Change s1 to 12000, flexible splits should adjust to maintain balance
-    result = service.recalculate_flexible_splits(s1, 12000, cur_id, trans_id)
+    result = service.recalculate_flexible_splits(2000, cur_id, trans_id)
     assert result  # recalculation happened
 
     updated_splits = repos["split"].get_by_transaction(trans_id)
@@ -127,3 +127,54 @@ def test_recalculate_flexible_splits(service, repos):
     # After recalc, total of flexible + fixed should be 0
     # s1 is now 12000, flexible should sum to -12000
     assert total == -12000
+
+
+def test_recalculate_flexible_splits_rebalances_existing_imbalance(service, repos):
+    cur_id = repos["currency"].insert("USD", "CURR", None, 100)
+    acc1 = repos["account"].insert(None, "A", None, None, None, "ACT")
+    acc2 = repos["account"].insert(None, "B", None, None, None, "ACT")
+
+    trans_id = service.create_transaction("Test")
+    s1 = service.add_split(trans_id, acc1, cur_id, amount=1000, amount_fixed=True)
+    s2 = service.add_split(trans_id, acc2, cur_id, amount=-900, amount_fixed=False)
+
+    changed = service.recalculate_flexible_splits(100, cur_id, trans_id)
+    assert changed
+
+    updated_s1 = repos["split"].get_by_id(s1)
+    updated_s2 = repos["split"].get_by_id(s2)
+    assert updated_s1.amount == 1000
+    assert updated_s2.amount == -1000
+
+
+def test_recalculate_flexible_splits_returns_false_without_flexible_split(service, repos):
+    cur_id = repos["currency"].insert("USD", "CURR", None, 100)
+    acc1 = repos["account"].insert(None, "A", None, None, None, "ACT")
+    acc2 = repos["account"].insert(None, "B", None, None, None, "ACT")
+
+    trans_id = service.create_transaction("Test")
+    service.add_split(trans_id, acc1, cur_id, amount=1000, amount_fixed=True)
+    service.add_split(trans_id, acc2, cur_id, amount=-900, amount_fixed=True)
+
+    changed = service.recalculate_flexible_splits(100, cur_id, trans_id)
+    assert changed is False
+
+
+def test_delete_split_and_rebalance(service, repos):
+    cur_id = repos["currency"].insert("USD", "CURR", None, 100)
+    acc1 = repos["account"].insert(None, "A", None, None, None, "ACT")
+    acc2 = repos["account"].insert(None, "B", None, None, None, "ACT")
+    acc3 = repos["account"].insert(None, "C", None, None, None, "ACT")
+
+    trans_id = service.create_transaction("Test")
+    s1 = service.add_split(trans_id, acc1, cur_id, amount=1000, amount_fixed=True)
+    s2 = service.add_split(trans_id, acc2, cur_id, amount=-600, amount_fixed=False)
+    s3 = service.add_split(trans_id, acc3, cur_id, amount=-400, amount_fixed=False)
+
+    changed = service.delete_split_and_rebalance(s3)
+    assert changed
+
+    remaining = repos["split"].get_by_transaction_and_currency(trans_id, cur_id)
+    assert sorted((s.id for s in remaining)) == sorted((s1, s2))
+    total = sum(s.amount for s in remaining)
+    assert total == 0

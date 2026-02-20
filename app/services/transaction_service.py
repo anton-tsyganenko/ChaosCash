@@ -48,6 +48,20 @@ class TransactionService:
     def delete_split(self, split_id: int) -> None:
         self.split_repo.delete(split_id)
 
+    def delete_split_and_rebalance(self, split_id: int) -> bool:
+        """Delete split and rebalance remaining unfixed splits if possible."""
+        split = self.split_repo.get_by_id(split_id)
+        if split is None:
+            return False
+
+        trans_id = split.trans
+        currency_id = split.currency
+        self.split_repo.delete(split_id)
+
+        currency_splits = self.split_repo.get_by_transaction_and_currency(trans_id, currency_id)
+        imbalance = sum(s.amount for s in currency_splits)
+        return self.recalculate_flexible_splits(imbalance, currency_id, trans_id)
+
     def duplicate_transaction(self, trans_id: int) -> int:
         """Create a copy of the transaction with today's date. Returns new ID."""
         original = self.trans_repo.get_by_id(trans_id)
@@ -73,35 +87,40 @@ class TransactionService:
                                     s.description, None, -s.amount, s.amount_fixed)
         return new_id
 
-    def recalculate_flexible_splits(self, changed_split_id: int, new_amount: int,
+    def recalculate_flexible_splits(self, delta_amount: int,
                                     currency_id: int, trans_id: int) -> bool:
+        """Distribute ``delta_amount`` across unfixed splits in a currency.
+
+        Use cases:
+        - amount edit: pass changed_amount_delta = new_amount - old_amount
+        - existing imbalance: pass current imbalance sum for the currency
+
+        Returns True if distribution happened, False when there are no unfixed splits
+        (or delta is zero).
         """
-        Proportionally recalculate flexible splits after one split's amount changes.
-        Returns True if recalculation was possible, False if phantom row is needed.
-        """
+        if delta_amount == 0:
+            return False
+
         splits = self.split_repo.get_by_transaction_and_currency(trans_id, currency_id)
-        flexible = [s for s in splits if not s.amount_fixed and s.id != changed_split_id]
-
+        flexible = [s for s in splits if not s.amount_fixed]
         if not flexible:
-            return False  # No flexible splits, caller should show phantom row
+            return False
 
-        fixed_total = new_amount + sum(
-            s.amount for s in splits if s.amount_fixed and s.id != changed_split_id
-        )
-        remaining = -fixed_total
-
+        distribute_total = -delta_amount
         flexible_total = sum(s.amount for s in flexible)
         if flexible_total == 0:
-            per_split = remaining // len(flexible)
-            leftover = remaining - per_split * len(flexible)
+            per_split = distribute_total // len(flexible)
+            leftover = distribute_total - per_split * len(flexible)
             for i, s in enumerate(flexible):
-                self.split_repo.update_amount(s.id, per_split + (leftover if i == 0 else 0))
+                self.split_repo.update_amount(s.id, s.amount + per_split + (leftover if i == 0 else 0))
         else:
             distributed = 0
-            for i, s in enumerate(flexible[:-1]):
-                new_val = round(s.amount * remaining / flexible_total)
-                self.split_repo.update_amount(s.id, new_val)
-                distributed += new_val
-            # Last one gets the remainder to avoid rounding errors
-            self.split_repo.update_amount(flexible[-1].id, remaining - distributed)
+            for s in flexible[:-1]:
+                delta = round(s.amount * distribute_total / flexible_total)
+                self.split_repo.update_amount(s.id, s.amount + delta)
+                distributed += delta
+            self.split_repo.update_amount(
+                flexible[-1].id,
+                flexible[-1].amount + (distribute_total - distributed),
+            )
         return True

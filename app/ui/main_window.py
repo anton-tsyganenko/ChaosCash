@@ -458,6 +458,9 @@ class MainWindow(QMainWindow):
             return
         row = top_left.row()
         col = top_left.column()
+        if col == COL_AMOUNT and roles and Qt.ItemDataRole.EditRole not in roles \
+                and Qt.ItemDataRole.CheckStateRole not in roles:
+            return
         model = self.split_model
 
         row_type = model.get_row_type(row)
@@ -470,7 +473,7 @@ class MainWindow(QMainWindow):
                 if acc_id and cur_id and self._current_trans_id:
                     self.trans_service.add_split(
                         self._current_trans_id, acc_id, cur_id,
-                        amount=amount, amount_fixed=True
+                        amount=amount, amount_fixed=False
                     )
                     if self._new_trans_entry_mode:
                         self._post_reload_focus = (1, COL_AMOUNT)
@@ -495,6 +498,9 @@ class MainWindow(QMainWindow):
                         self._current_trans_id, acc_id, cur_id,
                         amount=amount_quants, amount_fixed=True
                     )
+                    self.trans_service.recalculate_flexible_splits(
+                        amount_quants, cur_id, self._current_trans_id
+                    )
                     QTimer.singleShot(0, self._on_split_changed)
             return
 
@@ -505,9 +511,16 @@ class MainWindow(QMainWindow):
         if col == COL_FIXED:
             fixed_state = model.index(row, COL_FIXED).data(Qt.ItemDataRole.CheckStateRole)
             if fixed_state is not None:
-                self.trans_service.update_split_fixed(
-                    split.id, fixed_state == Qt.CheckState.Checked
-                )
+                fixed_checked = fixed_state == Qt.CheckState.Checked
+                self.trans_service.update_split_fixed(split.id, fixed_checked)
+                if self._current_trans_id and not fixed_checked:
+                    currency_splits = self.split_repo.get_by_transaction_and_currency(
+                        self._current_trans_id, split.currency
+                    )
+                    imbalance = sum(s.amount for s in currency_splits)
+                    self.trans_service.recalculate_flexible_splits(
+                        imbalance, split.currency, self._current_trans_id
+                    )
                 QTimer.singleShot(0, self._on_split_changed)
             return
 
@@ -532,16 +545,21 @@ class MainWindow(QMainWindow):
         amount_quants = float_to_quants(amount_float, denom)
 
         if col == COL_AMOUNT:
-            amount_fixed = True
+            prev_amount_text = model._format_amt(split.amount, split.currency)
+            raw_amount_input = model.index(row, COL_AMOUNT).data(Qt.ItemDataRole.UserRole)
+            edited_text = raw_amount_input if isinstance(raw_amount_input, str) else amount_str
+            if str(edited_text).strip() != str(prev_amount_text).strip():
+                amount_fixed = True
 
         self.trans_service.update_split(
             split.id, acc_id, cur_id, desc, ext_id, amount_quants, amount_fixed
         )
 
-        # Proportional recalculation when amount changes
+        # Proportional recalculation / imbalance auto-distribution when amount changes
         if col == COL_AMOUNT and self._current_trans_id:
+            delta_amount = amount_quants - split.amount
             self.trans_service.recalculate_flexible_splits(
-                split.id, amount_quants, cur_id, self._current_trans_id
+                delta_amount, cur_id, self._current_trans_id
             )
 
         # New-transaction entry flow: advance focus after each step
@@ -551,6 +569,17 @@ class MainWindow(QMainWindow):
             elif col == COL_CURRENCY:
                 # After currency is set → focus phantom counter-split account
                 self._post_reload_focus = (-1, COL_ACCOUNT)
+
+        if self._current_trans_id:
+            affected_currencies = {cur_id, split.currency}
+            for affected_currency in affected_currencies:
+                currency_splits = self.split_repo.get_by_transaction_and_currency(
+                    self._current_trans_id, affected_currency
+                )
+                imbalance = sum(s.amount for s in currency_splits)
+                self.trans_service.recalculate_flexible_splits(
+                    imbalance, affected_currency, self._current_trans_id
+                )
 
         QTimer.singleShot(0, self._on_split_changed)
 

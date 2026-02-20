@@ -59,9 +59,15 @@ class AmountDelegate(QStyledItemDelegate):
         text = editor.text().strip()
         if not text:
             model.setData(index, "0", Qt.ItemDataRole.EditRole)
+            model.setData(index, "", Qt.ItemDataRole.UserRole)
             return
         try:
             result = safe_eval(self._preprocess(text))
+            # Keep evaluated value in the amount cell, but store raw user input
+            # in UserRole so caller can detect textual edits (e.g. "1000/2").
+            # UserRole is written first so change handlers can read it while
+            # processing the EditRole notification.
+            model.setData(index, text, Qt.ItemDataRole.UserRole)
             model.setData(index, f"{result}", Qt.ItemDataRole.EditRole)
         except ValueError:
             pass  # editor was closed without Enter (e.g. click away) — discard silently
