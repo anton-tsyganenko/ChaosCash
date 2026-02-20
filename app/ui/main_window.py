@@ -22,7 +22,7 @@ from app.services.integrity_service import IntegrityService
 from app.ui.item_models.account_tree_model import AccountTreeModel
 from app.ui.item_models.transaction_model import TransactionModel
 from app.ui.item_models.split_model import (
-    SplitModel, ROW_PHANTOM, ROW_NEW, COL_ACCOUNT, COL_AMOUNT, COL_CURRENCY
+    SplitModel, ROW_PHANTOM, ROW_NEW, COL_ACCOUNT, COL_AMOUNT, COL_CURRENCY, COL_FIXED
 )
 from app.ui.widgets.account_tree_view import AccountTreeView
 from app.ui.widgets.transaction_view import TransactionView
@@ -499,6 +499,16 @@ class MainWindow(QMainWindow):
             return
 
         if split is None:
+            return
+
+        # Handle Fixed checkbox toggle directly — avoids re-parsing amount
+        if col == COL_FIXED:
+            fixed_state = model.index(row, COL_FIXED).data(Qt.ItemDataRole.CheckStateRole)
+            if fixed_state is not None:
+                self.trans_service.update_split_fixed(
+                    split.id, fixed_state == Qt.CheckState.Checked
+                )
+                QTimer.singleShot(0, self._on_split_changed)
             return
 
         # Gather current values from model

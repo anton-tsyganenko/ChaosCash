@@ -89,6 +89,24 @@ def test_reverse_transaction(service, repos):
     assert amounts == [-5000, 5000]
 
 
+def test_update_split_fixed(service, repos):
+    cur_id = repos["currency"].insert("USD", "CURR", None, 100)
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
+    trans_id = service.create_transaction("Test")
+    split_id = service.add_split(trans_id, acc_id, cur_id, amount=1000, amount_fixed=False)
+
+    split = repos["split"].get_by_id(split_id)
+    assert split.amount_fixed is False
+
+    service.update_split_fixed(split_id, True)
+    split = repos["split"].get_by_id(split_id)
+    assert split.amount_fixed is True
+
+    service.update_split_fixed(split_id, False)
+    split = repos["split"].get_by_id(split_id)
+    assert split.amount_fixed is False
+
+
 def test_recalculate_flexible_splits(service, repos):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
     acc1 = repos["account"].insert(None, "A", None, None, None, "ACT")

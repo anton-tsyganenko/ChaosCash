@@ -42,6 +42,9 @@ class TransactionService:
         self.split_repo.update(split_id, account_id, currency_id,
                                 description, external_id, amount, amount_fixed)
 
+    def update_split_fixed(self, split_id: int, amount_fixed: bool) -> None:
+        self.split_repo.update_amount_fixed(split_id, amount_fixed)
+
     def delete_split(self, split_id: int) -> None:
         self.split_repo.delete(split_id)
 
