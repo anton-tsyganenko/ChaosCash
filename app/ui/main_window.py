@@ -392,7 +392,21 @@ class MainWindow(QMainWindow):
         if self._current_trans_id:
             self.split_model.load(self._current_trans_id)
         if self._virtual_mode is not None:
-            self._load_virtual_transactions(self._virtual_mode)
+            # Reload only the transaction list; do NOT reset split_model or
+            # _current_trans_id — that would wipe the split panel while editing.
+            if self._virtual_mode == VIRTUAL_IMBALANCE_ID:
+                trans_ids = self.integrity_service.get_imbalanced_trans_ids()
+            elif self._virtual_mode == VIRTUAL_EMPTY_ID:
+                empty = self.integrity_service.get_empty_transactions()
+                trans_ids = [t.id for t in empty]
+            else:
+                trans_ids = []
+            self.trans_model.load_by_ids(trans_ids)
+            if self._current_trans_id:
+                row = self.trans_model.find_row_for_trans(self._current_trans_id)
+                if row >= 0:
+                    self.transaction_view.setCurrentIndex(
+                        self.trans_model.index(row, 0))
         elif self._selected_account_ids:
             self.trans_model.load(self._selected_account_ids)
             # Re-select current transaction after model reload
