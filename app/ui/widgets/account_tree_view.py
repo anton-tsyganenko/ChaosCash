@@ -11,6 +11,7 @@ from app.repositories.transaction_repo import TransactionRepo
 from app.repositories.split_repo import SplitRepo
 from app.services.balance_service import BalanceService
 from app.ui.dialogs.delete_account_dialog import DeleteAccountDialog
+from app.ui.widgets.view_helpers import set_column_visibility, show_column_visibility_menu
 
 
 class AccountTreeView(QTreeView):
@@ -130,21 +131,7 @@ class AccountTreeView(QTreeView):
 
 
     def _show_header_menu(self, pos):
-        header = self.header()
-        model = self.model()
-        if model is None:
-            return
-
-        menu = QMenu(self)
-        for logical in range(model.columnCount()):
-            title = model.headerData(logical, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
-            action = QAction(str(title), self)
-            action.setCheckable(True)
-            action.setChecked(not self.isColumnHidden(logical))
-            action.toggled.connect(lambda checked, col=logical: self._toggle_column(col, checked))
-            menu.addAction(action)
-
-        menu.exec(header.mapToGlobal(pos))
+        show_column_visibility_menu(self, self.header(), pos)
 
     def _show_context_menu(self, pos):
         index = self.indexAt(pos)
@@ -282,7 +269,4 @@ class AccountTreeView(QTreeView):
 
 
     def _toggle_column(self, col: int, checked: bool):
-        visible = sum(0 if self.isColumnHidden(i) else 1 for i in range(self.model().columnCount()))
-        if not checked and visible <= 1:
-            return
-        self.setColumnHidden(col, not checked)
+        set_column_visibility(self, col, checked)

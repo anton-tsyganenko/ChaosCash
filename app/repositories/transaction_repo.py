@@ -15,6 +15,14 @@ class TransactionRepo:
     def __init__(self, conn: sqlite3.Connection):
         self.conn = conn
 
+    def _fetch_dicts_with_ids(self, query_template: str, ids: list[int]) -> list[dict]:
+        if not ids:
+            return []
+        placeholders = ",".join("?" * len(ids))
+        sql = query_template.format(placeholders=placeholders)
+        rows = self.conn.execute(sql, ids).fetchall()
+        return [dict(r) for r in rows]
+
     def get_by_id(self, trans_id: int) -> Transaction | None:
         row = self.conn.execute(Q.GET_BY_ID, (trans_id,)).fetchone()
         return _row_to_trans(row) if row else None
@@ -33,36 +41,16 @@ class TransactionRepo:
         self.conn.commit()
 
     def get_verbose_by_accounts(self, account_ids: list[int]) -> list[dict]:
-        if not account_ids:
-            return []
-        placeholders = ",".join("?" * len(account_ids))
-        sql = Q.GET_VERBOSE_BY_ACCOUNTS.format(placeholders=placeholders)
-        rows = self.conn.execute(sql, account_ids).fetchall()
-        return [dict(r) for r in rows]
+        return self._fetch_dicts_with_ids(Q.GET_VERBOSE_BY_ACCOUNTS, account_ids)
 
     def get_summary_by_accounts(self, account_ids: list[int]) -> list[dict]:
-        if not account_ids:
-            return []
-        placeholders = ",".join("?" * len(account_ids))
-        sql = Q.GET_SUMMARY_BY_ACCOUNTS.format(placeholders=placeholders)
-        rows = self.conn.execute(sql, account_ids).fetchall()
-        return [dict(r) for r in rows]
+        return self._fetch_dicts_with_ids(Q.GET_SUMMARY_BY_ACCOUNTS, account_ids)
 
     def get_verbose_by_ids(self, trans_ids: list[int]) -> list[dict]:
-        if not trans_ids:
-            return []
-        placeholders = ",".join("?" * len(trans_ids))
-        sql = Q.GET_VERBOSE_BY_IDS.format(placeholders=placeholders)
-        rows = self.conn.execute(sql, trans_ids).fetchall()
-        return [dict(r) for r in rows]
+        return self._fetch_dicts_with_ids(Q.GET_VERBOSE_BY_IDS, trans_ids)
 
     def get_summary_by_ids(self, trans_ids: list[int]) -> list[dict]:
-        if not trans_ids:
-            return []
-        placeholders = ",".join("?" * len(trans_ids))
-        sql = Q.GET_SUMMARY_BY_IDS.format(placeholders=placeholders)
-        rows = self.conn.execute(sql, trans_ids).fetchall()
-        return [dict(r) for r in rows]
+        return self._fetch_dicts_with_ids(Q.GET_SUMMARY_BY_IDS, trans_ids)
 
     def get_imbalanced(self) -> list[dict]:
         rows = self.conn.execute(Q.GET_IMBALANCED).fetchall()

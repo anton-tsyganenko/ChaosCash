@@ -1,160 +1,41 @@
 """Searchable account combo delegate."""
-from PyQt6.QtWidgets import QStyledItemDelegate, QComboBox, QLineEdit
-from PyQt6.QtCore import Qt, QEvent
-from PyQt6.QtGui import QKeyEvent
-import logging
+
 from app.repositories.account_repo import AccountRepo
+from app.ui.delegates.searchable_combo_delegate import SearchableComboDelegate
 
 
-class AccountComboDelegate(QStyledItemDelegate):
+class AccountComboDelegate(SearchableComboDelegate):
     """Searchable combobox for account selection in splits."""
 
     def __init__(self, account_repo: AccountRepo, settings, parent=None):
         super().__init__(parent)
         self.account_repo = account_repo
         self.settings = settings
-        self._logger = logging.getLogger("chaoscash.ui.delegate.account_combo")
 
-    def _get_accounts(self):
-        """Return list of (id, path) for selectable accounts."""
-        all_accs = self.account_repo.get_all()
-        acc_map = {a.id: a for a in all_accs}
+    def _get_items(self) -> list[tuple[str, int]]:
+        """Return list of (path, id) for selectable accounts."""
+        all_accounts = self.account_repo.get_all()
+        account_map = {account.id: account for account in all_accounts}
 
-        def build_path(acc_id):
+        def build_path(account_id: int) -> str:
             parts = []
-            cid = acc_id
-            while cid is not None:
-                acc = acc_map.get(cid)
-                if acc is None:
+            current_id = account_id
+            while current_id is not None:
+                account = account_map.get(current_id)
+                if account is None:
                     break
-                parts.insert(0, acc.name)
-                cid = acc.parent
+                parts.insert(0, account.name)
+                current_id = account.parent
             return self.settings.account_path_sep.join(parts)
 
         show_hidden = self.settings.show_hidden_accounts
-        result = []
-        for acc in all_accs:
-            if acc.status == "GRP":
+        items: list[tuple[str, int]] = []
+        for account in all_accounts:
+            if account.status == "GRP":
                 continue
-            if acc.status == "HID" and not show_hidden:
+            if account.status == "HID" and not show_hidden:
                 continue
-            result.append((acc.id, build_path(acc.id)))
-        result.sort(key=lambda x: x[1].lower())
-        return result
+            items.append((build_path(account.id), account.id))
 
-    def createEditor(self, parent, option, index):
-        editor = QComboBox(parent)
-        editor.setEditable(True)
-        editor.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        for acc_id, path in self._get_accounts():
-            editor.addItem(path, acc_id)
-        editor.completer().setFilterMode(Qt.MatchFlag.MatchContains)
-        editor.completer().setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        editor.installEventFilter(self)
-        if editor.lineEdit() is not None:
-            editor.lineEdit().installEventFilter(self)
-        return editor
-
-    def eventFilter(self, watched, event):
-        if event.type() == QEvent.Type.KeyPress and isinstance(event, QKeyEvent):
-            combo = None
-            if isinstance(watched, QComboBox):
-                combo = watched
-            elif isinstance(watched, QLineEdit) and isinstance(watched.parent(), QComboBox):
-                combo = watched.parent()
-
-            if combo is not None and event.key() == Qt.Key.Key_Tab:
-                self._logger.debug(
-                    "Tab intercepted combo=%s text_before=%r current_data_before=%r",
-                    combo.__class__.__name__,
-                    combo.currentText(),
-                    combo.currentData(),
-                )
-                self._apply_current_completion(combo)
-                self._logger.debug(
-                    "Tab commit combo=%s text_after_completion=%r current_data_after=%r current_index_after=%r",
-                    combo.__class__.__name__,
-                    combo.currentText(),
-                    combo.currentData(),
-                    combo.currentIndex(),
-                )
-                self.commitData.emit(combo)
-                self.closeEditor.emit(combo, QStyledItemDelegate.EndEditHint.EditNextItem)
-                return True
-        return super().eventFilter(watched, event)
-
-    def _sync_index_with_text(self, combo: QComboBox) -> None:
-        text = combo.currentText().strip().lower()
-        if not text:
-            return
-        for i in range(combo.count()):
-            if combo.itemText(i).strip().lower() == text:
-                combo.setCurrentIndex(i)
-                return
-
-    def _apply_current_completion(self, combo: QComboBox) -> None:
-        completer = combo.completer()
-        if completer is None:
-            return
-
-        popup = completer.popup()
-        if popup is not None and popup.isVisible():
-            idx = popup.currentIndex()
-            if idx.isValid():
-                combo.setEditText(str(idx.data()))
-                return
-
-        # Use Qt completer's current completion when popup is not visible.
-        completion = (completer.currentCompletion() or "").strip()
-        if completion:
-            combo.setEditText(completion)
-
-        self._sync_index_with_text(combo)
-
-    def setEditorData(self, editor: QComboBox, index):
-        account_id = index.data(Qt.ItemDataRole.UserRole)
-        for i in range(editor.count()):
-            if editor.itemData(i) == account_id:
-                editor.setCurrentIndex(i)
-                editor.lineEdit().selectAll()
-                return
-        text = index.data(Qt.ItemDataRole.DisplayRole) or ""
-        idx = editor.findText(text)
-        if idx >= 0:
-            editor.setCurrentIndex(idx)
-        editor.lineEdit().selectAll()
-
-    def setModelData(self, editor: QComboBox, model, index):
-        self._sync_index_with_text(editor)
-        current_index = editor.currentIndex()
-        selected_id = (editor.itemData(current_index)
-                       if current_index >= 0 else editor.currentData())
-        current_text = editor.currentText().strip()
-        previous_display = index.data(Qt.ItemDataRole.DisplayRole)
-        previous_user = index.data(Qt.ItemDataRole.UserRole)
-        self._logger.debug(
-            "setModelData row=%s col=%s text=%r selected_id=%r prev_display=%r prev_user=%r count=%s current_index=%s",
-            index.row(), index.column(), current_text, selected_id, previous_display, previous_user, editor.count(), current_index
-        )
-
-        if selected_id is not None:
-            selected_idx = current_index if current_index >= 0 else editor.findData(selected_id)
-            display_text = (editor.itemText(selected_idx).strip()
-                            if selected_idx >= 0 else current_text)
-            self._logger.debug(
-                "setModelData commit row=%s col=%s selected_idx=%s display=%r user=%r",
-                index.row(), index.column(), selected_idx, display_text, selected_id,
-            )
-            model.setData(index, display_text, Qt.ItemDataRole.DisplayRole)
-            model.setData(index, selected_id, Qt.ItemDataRole.UserRole)
-            return
-
-        self._logger.debug(
-            "setModelData rollback row=%s col=%s restoring display=%r user=%r",
-            index.row(), index.column(), previous_display, previous_user,
-        )
-        model.setData(index, previous_display, Qt.ItemDataRole.DisplayRole)
-        model.setData(index, previous_user, Qt.ItemDataRole.UserRole)
-
-    def updateEditorGeometry(self, editor, option, index):
-        editor.setGeometry(option.rect)
+        items.sort(key=lambda item: item[0].lower())
+        return items

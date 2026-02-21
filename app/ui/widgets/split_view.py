@@ -6,6 +6,11 @@ from PyQt6.QtGui import QAction
 from app.i18n import tr
 from app.services.transaction_service import TransactionService
 from app.ui.item_models.split_model import SplitModel, ROW_PHANTOM, ROW_REAL, COL_FIXED
+from app.ui.widgets.view_helpers import (
+    find_next_editable_table_cell,
+    set_column_visibility,
+    show_column_visibility_menu,
+)
 
 
 class SplitView(QTableView):
@@ -77,24 +82,10 @@ class SplitView(QTableView):
     def moveCursor(self, cursorAction, modifiers):
         self._logger.debug("moveCursor action=%s modifiers=%s row=%s col=%s", cursorAction.name, int(modifiers.value), self.currentIndex().row() if self.currentIndex().isValid() else -1, self.currentIndex().column() if self.currentIndex().isValid() else -1)
         if cursorAction == QAbstractItemView.CursorAction.MoveNext:
-            idx = self.currentIndex()
-            model = self.model()
-            if model is not None and idx.isValid():
-                row = idx.row()
-                col = idx.column()
-                row_count = model.rowCount()
-                col_count = model.columnCount()
-                while True:
-                    col += 1
-                    if col >= col_count:
-                        col = 0
-                        row += 1
-                    if row >= row_count:
-                        break
-                    cand = model.index(row, col)
-                    if model.flags(cand) & Qt.ItemFlag.ItemIsEditable:
-                        self._logger.debug("moveCursor next editable row=%s col=%s", row, col)
-                        return cand
+            next_index = find_next_editable_table_cell(self)
+            if next_index is not None:
+                self._logger.debug("moveCursor next editable row=%s col=%s", next_index.row(), next_index.column())
+                return next_index
         return super().moveCursor(cursorAction, modifiers)
 
     def mousePressEvent(self, event):
@@ -139,25 +130,7 @@ class SplitView(QTableView):
 
 
     def _show_header_menu(self, pos):
-        header = self.horizontalHeader()
-        model = self.model()
-        if model is None:
-            return
-
-        menu = QMenu(self)
-        for logical in range(model.columnCount()):
-            title = model.headerData(logical, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
-            action = QAction(str(title), self)
-            action.setCheckable(True)
-            action.setChecked(not self.isColumnHidden(logical))
-            action.toggled.connect(lambda checked, col=logical: self._toggle_column(col, checked))
-            menu.addAction(action)
-
-        menu.exec(header.mapToGlobal(pos))
-
+        show_column_visibility_menu(self, self.horizontalHeader(), pos)
 
     def _toggle_column(self, col: int, checked: bool):
-        visible = sum(0 if self.isColumnHidden(i) else 1 for i in range(self.model().columnCount()))
-        if not checked and visible <= 1:
-            return
-        self.setColumnHidden(col, not checked)
+        set_column_visibility(self, col, checked)

@@ -1,4 +1,4 @@
-"""Balance calculation service with lazy-loading cache."""
+"""Balance calculation service."""
 from collections import defaultdict
 from app.repositories.account_repo import AccountRepo
 from app.repositories.split_repo import SplitRepo
@@ -8,15 +8,12 @@ class BalanceService:
     """
     Calculates and caches account balances.
 
-    Cache key: (account_id, currency_id) -> amount_in_quants
     GRP accounts are computed recursively from children.
     """
 
     def __init__(self, account_repo: AccountRepo, split_repo: SplitRepo):
         self.account_repo = account_repo
         self.split_repo = split_repo
-        # {(account_id, currency_id): quants}
-        self._cache: dict[tuple[int, int], int] = {}
         # {account_id: {currency_id: quants}}  — leaf balances only
         self._leaf_cache: dict[int, dict[int, int]] = {}
 
@@ -24,13 +21,6 @@ class BalanceService:
         """Invalidate account and all its ancestors up to root."""
         current_id: int | None = account_id
         while current_id is not None:
-            if currency_id is not None:
-                self._cache.pop((current_id, currency_id), None)
-            else:
-                # Invalidate all currencies for this account
-                keys = [k for k in self._cache if k[0] == current_id]
-                for k in keys:
-                    del self._cache[k]
             self._leaf_cache.pop(current_id, None)
             current_id = self.account_repo.get_parent_id(current_id)
 
@@ -61,5 +51,4 @@ class BalanceService:
         return balance
 
     def clear(self) -> None:
-        self._cache.clear()
         self._leaf_cache.clear()

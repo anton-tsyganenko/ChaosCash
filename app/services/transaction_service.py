@@ -2,9 +2,6 @@
 from datetime import datetime, timezone
 from app.repositories.transaction_repo import TransactionRepo
 from app.repositories.split_repo import SplitRepo
-from app.models.transaction import Transaction
-from app.models.split import Split
-
 
 UTC = timezone.utc
 
@@ -64,27 +61,41 @@ class TransactionService:
 
     def duplicate_transaction(self, trans_id: int) -> int:
         """Create a copy of the transaction with today's date. Returns new ID."""
-        original = self.trans_repo.get_by_id(trans_id)
-        if original is None:
-            raise ValueError(f"Transaction {trans_id} not found")
-        splits = self.split_repo.get_by_transaction(trans_id)
-        new_id = self.trans_repo.insert(_utc_now(), original.description)
-        for s in splits:
-            self.split_repo.insert(new_id, s.account, s.currency,
-                                    s.description, None, s.amount, s.amount_fixed)
-        return new_id
+        return self._copy_transaction(
+            trans_id,
+            description_builder=lambda original: original.description,
+            amount_transform=lambda amount: amount,
+        )
 
     def reverse_transaction(self, trans_id: int) -> int:
         """Create a reversal transaction (all amounts negated). Returns new ID."""
+        return self._copy_transaction(
+            trans_id,
+            description_builder=lambda original: (
+                f"Reversal: {original.description}" if original.description else "Reversal"
+            ),
+            amount_transform=lambda amount: -amount,
+        )
+
+    def _copy_transaction(self, trans_id: int, description_builder,
+                          amount_transform) -> int:
+        """Copy transaction and its splits with optional transformations."""
         original = self.trans_repo.get_by_id(trans_id)
         if original is None:
             raise ValueError(f"Transaction {trans_id} not found")
+
         splits = self.split_repo.get_by_transaction(trans_id)
-        desc = f"Reversal: {original.description}" if original.description else "Reversal"
-        new_id = self.trans_repo.insert(_utc_now(), desc)
-        for s in splits:
-            self.split_repo.insert(new_id, s.account, s.currency,
-                                    s.description, None, -s.amount, s.amount_fixed)
+        new_id = self.trans_repo.insert(_utc_now(), description_builder(original))
+        for split in splits:
+            self.split_repo.insert(
+                new_id,
+                split.account,
+                split.currency,
+                split.description,
+                None,
+                amount_transform(split.amount),
+                split.amount_fixed,
+            )
         return new_id
 
     def recalculate_flexible_splits(self, delta_amount: int,
