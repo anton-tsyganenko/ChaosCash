@@ -105,6 +105,7 @@ class MainWindow(QMainWindow):
             self.account_repo, self.trans_repo, self.split_repo,
             self.balance_service, self.settings
         )
+        self.account_tree.setObjectName("account_tree")
 
         # Right: transactions + splits
         right_widget = QWidget()
@@ -554,6 +555,19 @@ class MainWindow(QMainWindow):
         self._load_transactions()
 
     def _on_split_changed(self):
+        if self.split_view.state() == QAbstractItemView.State.EditingState:
+            QTimer.singleShot(50, self._on_split_changed)
+            return
+
+        focus_widget = QApplication.focusWidget()
+        had_split_focus = bool(
+            self.split_view.hasFocus()
+            or (focus_widget is not None and self.split_view.isAncestorOf(focus_widget))
+        )
+        prev_idx = self.split_view.currentIndex()
+        prev_row = prev_idx.row() if prev_idx.isValid() else -1
+        prev_col = prev_idx.column() if prev_idx.isValid() else -1
+
         self.balance_service.clear()
         self._refresh_integrity()
         if self._current_trans_id:
@@ -612,6 +626,17 @@ class MainWindow(QMainWindow):
             finally:
                 sel_model.blockSignals(False)
 
+
+        # Restore split selection/focus after model reload triggered by edit commit.
+        if prev_row >= 0 and prev_col >= 0 and self.split_model.rowCount() > 0:
+            row = min(prev_row, self.split_model.rowCount() - 1)
+            col = min(prev_col, self.split_model.columnCount() - 1)
+            restore_idx = self.split_model.index(row, col)
+            if restore_idx.isValid():
+                self.split_view.setCurrentIndex(restore_idx)
+                if had_split_focus:
+                    self.split_view.setFocus()
+
         # Apply deferred split cell focus for new-transaction entry flow
         if self._post_reload_focus is not None:
             r, c = self._post_reload_focus
@@ -628,7 +653,6 @@ class MainWindow(QMainWindow):
         desc_val = self.trans_model.index(row, 2).data()
         if date_val and desc_val is not None:
             self.trans_service.update_transaction(trans_id, date_val, desc_val)
-        QTimer.singleShot(0, self._on_split_changed)
 
     def _on_split_data_changed(self, top_left: QModelIndex, bottom_right: QModelIndex, roles):
         """Handle inline edits in split table."""
@@ -687,6 +711,12 @@ class MainWindow(QMainWindow):
 
         if split is None:
             return
+
+        # Refresh split snapshot from DB to avoid overwriting recent inline edits
+        # when another field is committed before model reload completes.
+        latest_split = self.split_repo.get_by_id(split.id)
+        if latest_split is not None:
+            split = latest_split
 
         # Handle Fixed checkbox toggle directly — avoids re-parsing amount
         if col == COL_FIXED:

@@ -2,6 +2,7 @@
 from PyQt6.QtWidgets import QStyledItemDelegate, QLineEdit, QToolTip
 from PyQt6.QtCore import Qt, QEvent
 from app.utils.expression_parser import safe_eval
+import logging
 
 
 class AmountDelegate(QStyledItemDelegate):
@@ -10,6 +11,7 @@ class AmountDelegate(QStyledItemDelegate):
     def __init__(self, settings, parent=None):
         super().__init__(parent)
         self.settings = settings
+        self._logger = logging.getLogger("chaoscash.ui.delegate.amount")
 
     def _preprocess(self, text: str) -> str:
         """Normalise locale-specific separators so safe_eval can parse the result.
@@ -57,12 +59,19 @@ class AmountDelegate(QStyledItemDelegate):
 
     def setModelData(self, editor: QLineEdit, model, index):
         text = editor.text().strip()
+        self._logger.debug(
+            "setModelData row=%s col=%s text=%r prev_edit=%r prev_user=%r",
+            index.row(), index.column(), text,
+            index.data(Qt.ItemDataRole.EditRole), index.data(Qt.ItemDataRole.UserRole),
+        )
         if not text:
+            self._logger.debug("setModelData empty -> write 0 and clear user role")
             model.setData(index, "0", Qt.ItemDataRole.EditRole)
             model.setData(index, "", Qt.ItemDataRole.UserRole)
             return
         try:
             result = safe_eval(self._preprocess(text))
+            self._logger.debug("setModelData evaluated text=%r result=%s", text, result)
             # Keep evaluated value in the amount cell, but store raw user input
             # in UserRole so caller can detect textual edits (e.g. "1000/2").
             # UserRole is written first so change handlers can read it while
@@ -70,6 +79,7 @@ class AmountDelegate(QStyledItemDelegate):
             model.setData(index, text, Qt.ItemDataRole.UserRole)
             model.setData(index, f"{result}", Qt.ItemDataRole.EditRole)
         except ValueError:
+            self._logger.debug("setModelData invalid expression text=%r; ignore commit", text)
             pass  # editor was closed without Enter (e.g. click away) — discard silently
 
     def updateEditorGeometry(self, editor, option, index):

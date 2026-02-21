@@ -238,12 +238,34 @@ class TransactionModel(QAbstractTableModel):
         if 0 <= row < len(self._rows):
             col = index.column()
             if col == COL_DATE:
-                self._rows[row]["Date"] = str(value)
-                self.dataChanged.emit(index, index, [role])
+                new_date = str(value)
+                trans_id = self._rows[row].get("ID")
+
+                # Keep all rows for the same transaction in sync (verbose mode has
+                # multiple rows per transaction).
+                for r in self._all_rows:
+                    if r.get("ID") == trans_id:
+                        r["Date"] = new_date
+
+                changed_rows = [i for i, r in enumerate(self._rows) if r.get("ID") == trans_id]
+                for changed_row in changed_rows:
+                    changed_idx = self.index(changed_row, COL_DATE)
+                    self.dataChanged.emit(changed_idx, changed_idx, [role])
                 return True
             elif col == COL_DESC:
-                self._rows[row]["Description"] = str(value)
-                self.dataChanged.emit(index, index, [role])
+                new_desc = str(value)
+                trans_id = self._rows[row].get("ID")
+
+                # Keep all rows for the same transaction in sync (applies to
+                # verbose and summary modes when one transaction spans rows).
+                for r in self._all_rows:
+                    if r.get("ID") == trans_id:
+                        r["Description"] = new_desc
+
+                changed_rows = [i for i, r in enumerate(self._rows) if r.get("ID") == trans_id]
+                for changed_row in changed_rows:
+                    changed_idx = self.index(changed_row, COL_DESC)
+                    self.dataChanged.emit(changed_idx, changed_idx, [role])
                 return True
         return False
 

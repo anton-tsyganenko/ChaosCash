@@ -1,4 +1,5 @@
 """Split table view with context menu."""
+import logging
 from PyQt6.QtWidgets import QTableView, QMenu, QAbstractItemView
 from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex
 from PyQt6.QtGui import QAction
@@ -18,6 +19,7 @@ class SplitView(QTableView):
     def __init__(self, trans_service: TransactionService, parent=None):
         super().__init__(parent)
         self.trans_service = trans_service
+        self._logger = logging.getLogger("chaoscash.ui.split_view")
 
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
@@ -30,6 +32,7 @@ class SplitView(QTableView):
         header.customContextMenuRequested.connect(self._show_header_menu)
 
         self.setSortingEnabled(True)
+        self.setObjectName("split_view")
 
 
     def _first_editable_in_row(self, row: int):
@@ -43,6 +46,7 @@ class SplitView(QTableView):
         return QModelIndex()
 
     def keyPressEvent(self, event):
+        self._logger.debug("keyPressEvent key=%s text=%r modifiers=%s state=%s row=%s col=%s", event.key(), event.text(), int(event.modifiers().value), self.state().name, self.currentIndex().row() if self.currentIndex().isValid() else -1, self.currentIndex().column() if self.currentIndex().isValid() else -1)
         if self.state() == QAbstractItemView.State.EditingState:
             if event.key() == Qt.Key.Key_Escape:
                 super().keyPressEvent(event)
@@ -71,6 +75,7 @@ class SplitView(QTableView):
         super().keyPressEvent(event)
 
     def moveCursor(self, cursorAction, modifiers):
+        self._logger.debug("moveCursor action=%s modifiers=%s row=%s col=%s", cursorAction.name, int(modifiers.value), self.currentIndex().row() if self.currentIndex().isValid() else -1, self.currentIndex().column() if self.currentIndex().isValid() else -1)
         if cursorAction == QAbstractItemView.CursorAction.MoveNext:
             idx = self.currentIndex()
             model = self.model()
@@ -88,10 +93,12 @@ class SplitView(QTableView):
                         break
                     cand = model.index(row, col)
                     if model.flags(cand) & Qt.ItemFlag.ItemIsEditable:
+                        self._logger.debug("moveCursor next editable row=%s col=%s", row, col)
                         return cand
         return super().moveCursor(cursorAction, modifiers)
 
     def mousePressEvent(self, event):
+        self._logger.debug("mousePressEvent button=%s buttons=%s x=%s y=%s row=%s col=%s", int(event.button().value), int(event.buttons().value), event.position().x(), event.position().y(), self.indexAt(event.pos()).row() if self.indexAt(event.pos()).isValid() else -1, self.indexAt(event.pos()).column() if self.indexAt(event.pos()).isValid() else -1)
         index = self.indexAt(event.pos())
         if (index.isValid()
                 and index.column() == COL_FIXED

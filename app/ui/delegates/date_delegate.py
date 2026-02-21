@@ -2,6 +2,7 @@
 from PyQt6.QtWidgets import QStyledItemDelegate, QDateTimeEdit
 from PyQt6.QtCore import Qt, QDateTime
 from datetime import datetime, timezone
+import logging
 
 UTC = timezone.utc
 
@@ -12,6 +13,7 @@ class DateDelegate(QStyledItemDelegate):
     def __init__(self, settings, parent=None):
         super().__init__(parent)
         self.settings = settings
+        self._logger = logging.getLogger("chaoscash.ui.delegate.date")
 
     def _qt_format(self) -> str:
         return self.settings.date_format  # e.g. "yyyy-MM-dd HH:mm:ss"
@@ -55,6 +57,11 @@ class DateDelegate(QStyledItemDelegate):
             tzinfo=self._local_tz()
         )
         utc_str = local_dt.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
+        self._logger.debug(
+            "setModelData row=%s col=%s qt=%s local=%s utc=%s prev=%r",
+            index.row(), index.column(), qt_dt.toString(Qt.DateFormat.ISODate), local_dt.isoformat(), utc_str,
+            index.data(Qt.ItemDataRole.EditRole),
+        )
         model.setData(index, utc_str, Qt.ItemDataRole.EditRole)
 
     def updateEditorGeometry(self, editor, option, index):
