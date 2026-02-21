@@ -5,11 +5,12 @@ from PyQt6.QtWidgets import (
     QMainWindow, QSplitter, QVBoxLayout, QWidget, QHeaderView,
     QFileDialog, QMessageBox, QApplication, QMenu
 )
-from PyQt6.QtCore import Qt, QModelIndex, QTimer, QItemSelectionModel
+from PyQt6.QtCore import Qt, QModelIndex, QTimer, QItemSelectionModel, QSettings
 from PyQt6.QtGui import QAction
 
 from app.i18n import tr
 from app.settings.app_settings import AppSettings
+from app.settings.display_settings import DisplaySettings
 from app.database.connection import open_connection
 from app.database.schema import ensure_schema
 from app.repositories.account_repo import AccountRepo
@@ -22,7 +23,7 @@ from app.services.integrity_service import IntegrityService
 from app.ui.item_models.account_tree_model import AccountTreeModel
 from app.ui.item_models.transaction_model import TransactionModel
 from app.ui.item_models.split_model import (
-    SplitModel, ROW_PHANTOM, ROW_NEW, COL_ACCOUNT, COL_AMOUNT, COL_CURRENCY, COL_FIXED
+    SplitModel, ROW_PHANTOM, ROW_NEW, COL_EXTID, COL_DESC, COL_ACCOUNT, COL_FIXED, COL_AMOUNT, COL_CURRENCY
 )
 from app.ui.widgets.account_tree_view import AccountTreeView
 from app.ui.widgets.transaction_view import TransactionView
@@ -73,6 +74,10 @@ class MainWindow(QMainWindow):
         # (row, col) to focus in split view after next split_model.load(); row=-1 means last
         self._post_reload_focus: tuple[int, int] | None = None
 
+        self._acc_display = DisplaySettings("accounts")
+        self._trans_display = DisplaySettings("transactions")
+        self._split_display = DisplaySettings("splits")
+
         self._setup_ui()
         self._setup_menu()
         self._setup_models()
@@ -83,6 +88,7 @@ class MainWindow(QMainWindow):
         add_recent_file(db_path)
         self.setWindowTitle(os.path.basename(db_path))
         self.resize(1400, 900)
+        self._restore_window_layout()
 
     # --- UI Setup ---
 
@@ -206,12 +212,14 @@ class MainWindow(QMainWindow):
         self.account_tree.expandAll()
         hdr = self.account_tree.header()
         hdr.setStretchLastSection(False)
-        hdr.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        hdr.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
-        hdr.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
-        hdr.resizeSection(0, 200)
-        hdr.resizeSection(1, 120)
-        hdr.resizeSection(2, 70)
+        for col in range(self.account_model.columnCount()):
+            hdr.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
+        hdr.resizeSection(0, 220)
+        hdr.resizeSection(1, 130)
+        hdr.resizeSection(2, 90)
+        hdr.resizeSection(3, 120)
+        hdr.resizeSection(4, 220)
+        hdr.resizeSection(5, 70)
 
         # Transaction model
         self.trans_model = TransactionModel(
@@ -220,7 +228,6 @@ class MainWindow(QMainWindow):
         self.transaction_view.setModel(self.trans_model)
         th = self.transaction_view.horizontalHeader()
         th.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        # Auto-size date column to fit the configured date format
         try:
             fmt = self.settings.date_format
             fmt = fmt.replace("yyyy", "%Y").replace("MM", "%m").replace("dd", "%d")
@@ -239,18 +246,18 @@ class MainWindow(QMainWindow):
         self.split_view.setModel(self.split_model)
         sh = self.split_view.horizontalHeader()
         sh.setStretchLastSection(False)
-        # Description (col 1) gets all the extra space
-        sh.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        sh.setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        sh.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
-        sh.setSectionResizeMode(3, QHeaderView.ResizeMode.Interactive)
-        sh.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)
-        sh.setSectionResizeMode(5, QHeaderView.ResizeMode.Interactive)
-        sh.resizeSection(0, 80)   # Ext. ID
-        sh.resizeSection(2, 150)  # Account
-        sh.resizeSection(3, 50)   # Fixed
-        sh.resizeSection(4, 100)  # Amount
-        sh.resizeSection(5, 70)   # Currency
+        sh.setSectionResizeMode(COL_DESC, QHeaderView.ResizeMode.Stretch)
+        for col in range(self.split_model.columnCount()):
+            if col != COL_DESC:
+                sh.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
+        sh.resizeSection(0, 70)   # ID
+        sh.resizeSection(COL_EXTID, 80)
+        sh.resizeSection(COL_ACCOUNT, 150)
+        sh.resizeSection(COL_FIXED, 50)
+        sh.resizeSection(COL_AMOUNT, 100)
+        sh.resizeSection(COL_CURRENCY, 70)
+
+        self._restore_view_settings()
 
     def _setup_delegates(self):
         # Transaction view delegates
@@ -259,13 +266,13 @@ class MainWindow(QMainWindow):
 
         # Split view delegates
         amount_delegate = AmountDelegate(self.settings, self.split_view)
-        self.split_view.setItemDelegateForColumn(4, amount_delegate)
+        self.split_view.setItemDelegateForColumn(COL_AMOUNT, amount_delegate)
 
         account_delegate = AccountComboDelegate(self.account_repo, self.settings, self.split_view)
-        self.split_view.setItemDelegateForColumn(2, account_delegate)
+        self.split_view.setItemDelegateForColumn(COL_ACCOUNT, account_delegate)
 
         currency_delegate = CurrencyComboDelegate(self.currency_repo, self.split_view)
-        self.split_view.setItemDelegateForColumn(5, currency_delegate)
+        self.split_view.setItemDelegateForColumn(COL_CURRENCY, currency_delegate)
 
     def _connect_signals(self):
         self.account_tree.account_selected.connect(self._on_accounts_selected)
@@ -338,6 +345,104 @@ class MainWindow(QMainWindow):
         if idx.isValid() and (self.split_model.flags(idx) & Qt.ItemFlag.ItemIsEditable):
             self.split_view.setCurrentIndex(idx)
             self.split_view.edit(idx)
+
+    def _restore_window_layout(self):
+        s = QSettings("chaoscash", "chaoscash")
+        geo = s.value("ui/main_window/geometry")
+        if geo is not None:
+            self.restoreGeometry(geo)
+        main_sizes = s.value("ui/main_window/main_splitter_sizes")
+        if main_sizes:
+            self.main_splitter.setSizes([int(x) for x in main_sizes])
+        right_sizes = s.value("ui/main_window/right_splitter_sizes")
+        if right_sizes:
+            self.right_splitter.setSizes([int(x) for x in right_sizes])
+
+    def _restore_view_settings(self):
+        self._apply_display_settings(
+            self.account_tree, self.account_tree.header(), self._acc_display,
+            default_order=list(range(self.account_model.columnCount())),
+            default_widths={0: 220, 1: 130, 2: 90, 3: 120, 4: 220, 5: 70},
+            default_hidden=[],
+            default_sort_col=0,
+            default_sort_order=Qt.SortOrder.AscendingOrder,
+        )
+        self._apply_display_settings(
+            self.transaction_view, self.transaction_view.horizontalHeader(), self._trans_display,
+            default_order=list(range(self.trans_model.columnCount())),
+            default_widths={},
+            default_hidden=[],
+            default_sort_col=1,
+            default_sort_order=Qt.SortOrder.AscendingOrder,
+        )
+        self._apply_display_settings(
+            self.split_view, self.split_view.horizontalHeader(), self._split_display,
+            default_order=list(range(self.split_model.columnCount())),
+            default_widths={0: 70, 1: 80, 3: 150, 4: 50, 5: 100, 6: 70},
+            default_hidden=[],
+            default_sort_col=6,
+            default_sort_order=Qt.SortOrder.AscendingOrder,
+        )
+
+    def _apply_display_settings(self, view, header, display: DisplaySettings,
+                                default_order: list[int], default_widths: dict[int, int],
+                                default_hidden: list[int], default_sort_col: int,
+                                default_sort_order: Qt.SortOrder):
+        model = view.model()
+        if model is None:
+            return
+        col_count = model.columnCount()
+
+        order = display.get_column_order(default_order)
+        if sorted(order) == list(range(col_count)):
+            for visual_pos, logical in enumerate(order):
+                current = header.visualIndex(logical)
+                if current != visual_pos:
+                    header.moveSection(current, visual_pos)
+
+        hidden = [c for c in display.get_hidden_columns(default_hidden) if 0 <= c < col_count]
+        if len(hidden) >= col_count:
+            hidden = hidden[:-1]
+        for c in range(col_count):
+            view.setColumnHidden(c, c in hidden)
+
+        widths = display.get_column_widths(default_widths)
+        for col, width in widths.items():
+            if 0 <= col < col_count and width > 20:
+                header.resizeSection(col, width)
+
+        sort_col = display.get_sort_column(default_sort_col)
+        default_sort_value = int(default_sort_order.value)
+        sort_order = Qt.SortOrder(display.get_sort_order(default_sort_value))
+        if 0 <= sort_col < col_count:
+            view.sortByColumn(sort_col, sort_order)
+            header.setSortIndicator(sort_col, sort_order)
+
+    def _save_view_settings(self):
+        self._store_display_settings(self.account_tree, self.account_tree.header(), self._acc_display)
+        self._store_display_settings(self.transaction_view, self.transaction_view.horizontalHeader(), self._trans_display)
+        self._store_display_settings(self.split_view, self.split_view.horizontalHeader(), self._split_display)
+
+    def _store_display_settings(self, view, header, display: DisplaySettings):
+        model = view.model()
+        if model is None:
+            return
+        col_count = model.columnCount()
+        order = [header.logicalIndex(i) for i in range(col_count)]
+        hidden = [c for c in range(col_count) if view.isColumnHidden(c)]
+        widths = {c: header.sectionSize(c) for c in range(col_count)}
+
+        display.set_column_order(order)
+        display.set_hidden_columns(hidden)
+        display.set_column_widths(widths)
+        display.set_sort_column(header.sortIndicatorSection())
+        display.set_sort_order(int(header.sortIndicatorOrder().value))
+
+    def _save_window_layout(self):
+        s = QSettings("chaoscash", "chaoscash")
+        s.setValue("ui/main_window/geometry", self.saveGeometry())
+        s.setValue("ui/main_window/main_splitter_sizes", self.main_splitter.sizes())
+        s.setValue("ui/main_window/right_splitter_sizes", self.right_splitter.sizes())
 
     # --- Slots ---
 
@@ -540,26 +645,29 @@ class MainWindow(QMainWindow):
             return
 
         # Gather current values from model
-        ext_id = model.index(row, 0).data() or None
-        desc = model.index(row, 1).data() or None
+        ext_id = model.index(row, COL_EXTID).data() or None
+        desc = model.index(row, COL_DESC).data() or None
         acc_id = model.index(row, COL_ACCOUNT).data(Qt.ItemDataRole.UserRole) or split.account
         amount_str = model.index(row, COL_AMOUNT).data() or "0"
         cur_id = model.index(row, COL_CURRENCY).data(Qt.ItemDataRole.UserRole) or split.currency
 
-        fixed_state = model.index(row, 3).data(Qt.ItemDataRole.CheckStateRole)
+        fixed_state = model.index(row, COL_FIXED).data(Qt.ItemDataRole.CheckStateRole)
         amount_fixed = (fixed_state == Qt.CheckState.Checked
                         if fixed_state is not None else split.amount_fixed)
 
-        try:
-            amount_float = safe_eval(amount_str)
-        except ValueError:
-            return
-
-        cur = self.currency_repo.get_by_id(cur_id)
-        denom = cur.denominator if cur else 100
-        amount_quants = float_to_quants(amount_float, denom)
-
+        # Parse user input only when amount itself is edited.
+        # For account/currency/description edits keep existing amount as-is.
+        amount_quants = split.amount
         if col == COL_AMOUNT:
+            try:
+                amount_float = safe_eval(amount_str)
+            except ValueError:
+                return
+
+            cur = self.currency_repo.get_by_id(cur_id)
+            denom = cur.denominator if cur else 100
+            amount_quants = float_to_quants(amount_float, denom)
+
             prev_amount_text = model._format_amt(split.amount, split.currency)
             raw_amount_input = model.index(row, COL_AMOUNT).data(Qt.ItemDataRole.UserRole)
             edited_text = raw_amount_input if isinstance(raw_amount_input, str) else amount_str
@@ -681,6 +789,8 @@ class MainWindow(QMainWindow):
                 self.split_model.load(self._current_trans_id)
 
     def closeEvent(self, event):
+        self._save_view_settings()
+        self._save_window_layout()
         try:
             self._conn.close()
         except Exception:

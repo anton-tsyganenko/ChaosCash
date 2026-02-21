@@ -36,6 +36,14 @@ class AccountTreeView(QTreeView):
         self.customContextMenuRequested.connect(self._show_context_menu)
         self.clicked.connect(self._on_clicked)
 
+        header = self.header()
+        header.setSectionsMovable(True)
+        header.setFirstSectionMovable(True)
+        header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        header.customContextMenuRequested.connect(self._show_header_menu)
+
+        self.setSortingEnabled(True)
+
     def setModel(self, model):
         super().setModel(model)
         if model is not None:
@@ -85,6 +93,24 @@ class AccountTreeView(QTreeView):
                 selected_ids.append(node.account.id)
         if selected_ids:
             self.account_selected.emit(selected_ids)
+
+
+    def _show_header_menu(self, pos):
+        header = self.header()
+        model = self.model()
+        if model is None:
+            return
+
+        menu = QMenu(self)
+        for logical in range(model.columnCount()):
+            title = model.headerData(logical, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
+            action = QAction(str(title), self)
+            action.setCheckable(True)
+            action.setChecked(not self.isColumnHidden(logical))
+            action.toggled.connect(lambda checked, col=logical: self._toggle_column(col, checked))
+            menu.addAction(action)
+
+        menu.exec(header.mapToGlobal(pos))
 
     def _show_context_menu(self, pos):
         index = self.indexAt(pos)
@@ -219,3 +245,10 @@ class AccountTreeView(QTreeView):
                 return True
             current = self.account_repo.get_parent_id(current)
         return False
+
+
+    def _toggle_column(self, col: int, checked: bool):
+        visible = sum(0 if self.isColumnHidden(i) else 1 for i in range(self.model().columnCount()))
+        if not checked and visible <= 1:
+            return
+        self.setColumnHidden(col, not checked)

@@ -11,7 +11,6 @@ _DEFAULTS = {
     "thousands_sep": " ",
     "show_thousands": True,
     "account_path_sep": ":",
-    "account_sort": "name",   # name | code | name_code | code_name
     "show_hidden_accounts": False,
     "show_balances": True,
     "transaction_view_mode": "verbose",  # verbose | summary
@@ -50,10 +49,6 @@ class AppSettings:
     @property
     def account_path_sep(self) -> str:
         return str(self.get("account_path_sep"))
-
-    @property
-    def account_sort(self) -> str:
-        return str(self.get("account_sort"))
 
     @property
     def show_hidden_accounts(self) -> bool:

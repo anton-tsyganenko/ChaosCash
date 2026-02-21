@@ -23,6 +23,13 @@ class TransactionView(QTableView):
         self.customContextMenuRequested.connect(self._show_context_menu)
         self.clicked.connect(self._on_clicked)
 
+        header = self.horizontalHeader()
+        header.setSectionsMovable(True)
+        header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        header.customContextMenuRequested.connect(self._show_header_menu)
+
+        self.setSortingEnabled(True)
+
     def _on_clicked(self, index: QModelIndex):
         model: TransactionModel = self.model()
         trans_id = model.get_trans_id(index.row())
@@ -74,3 +81,29 @@ class TransactionView(QTableView):
         if reply == QMessageBox.StandardButton.Yes:
             self.trans_service.delete_transaction(trans_id)
             self.transactions_changed.emit()
+
+    def _show_header_menu(self, pos):
+        header = self.horizontalHeader()
+        menu = QMenu(self)
+        model = self.model()
+        if model is None:
+            return
+
+        for logical in range(model.columnCount()):
+            title = model.headerData(logical, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole)
+            action = QAction(str(title), self)
+            action.setCheckable(True)
+            action.setChecked(not self.isColumnHidden(logical))
+            action.toggled.connect(
+                lambda checked, col=logical: self._toggle_column(col, checked)
+            )
+            menu.addAction(action)
+
+        menu.exec(header.mapToGlobal(pos))
+
+
+    def _toggle_column(self, col: int, checked: bool):
+        visible = sum(0 if self.isColumnHidden(i) else 1 for i in range(self.model().columnCount()))
+        if not checked and visible <= 1:
+            return
+        self.setColumnHidden(col, not checked)

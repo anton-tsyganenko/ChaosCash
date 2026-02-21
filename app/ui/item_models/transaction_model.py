@@ -258,6 +258,32 @@ class TransactionModel(QAbstractTableModel):
                 return i
         return -1
 
+
+    def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder) -> None:
+        """Sort rows by selected column; keep phantom entry row at the end."""
+        reverse = order == Qt.SortOrder.DescendingOrder
+
+        def key(row: dict):
+            if column == COL_ID:
+                return row.get("ID") or 0
+            if column == COL_DATE:
+                return row.get("Date") or ""
+            if column == COL_DESC:
+                return (row.get("Description") or "").lower()
+            if column == COL_AMOUNT:
+                return row.get("Amount") if "Amount" in row else (row.get("TotalAmount") or 0)
+            if column == COL_BALANCE:
+                return row.get("Balance") or 0
+            if column == COL_CURRENCY:
+                return (row.get("CurrencyCode") or "").lower()
+            return 0
+
+        self.layoutAboutToBeChanged.emit()
+        self._all_rows.sort(key=key, reverse=reverse)
+        loaded = len(self._rows)
+        self._rows = self._all_rows[:loaded]
+        self.layoutChanged.emit()
+
     def set_filter(self, filter_text: str = "") -> None:
         """Placeholder for future filtering support."""
         pass

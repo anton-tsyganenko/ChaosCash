@@ -1,6 +1,6 @@
 """Application settings dialog."""
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QLineEdit, QComboBox,
+    QDialog, QVBoxLayout, QFormLayout, QLineEdit,
     QDialogButtonBox, QGroupBox
 )
 from app.i18n import tr
@@ -44,15 +44,6 @@ class SettingsDialog(QDialog):
         self.path_sep = QLineEdit(self.settings.account_path_sep)
         acc_form.addRow(tr("Account path separator:"), self.path_sep)
 
-        self.sort_order = QComboBox()
-        self.sort_order.addItem(tr("By name"), "name")
-        self.sort_order.addItem(tr("By code"), "code")
-        self.sort_order.addItem(tr("Name then code"), "name_code")
-        self.sort_order.addItem(tr("Code then name"), "code_name")
-        idx = self.sort_order.findData(self.settings.account_sort)
-        if idx >= 0:
-            self.sort_order.setCurrentIndex(idx)
-        acc_form.addRow(tr("Sort accounts:"), self.sort_order)
         layout.addWidget(acc_group)
 
         buttons = QDialogButtonBox(
@@ -68,5 +59,4 @@ class SettingsDialog(QDialog):
         self.settings.set("thousands_sep", sep)
         self.settings.set("show_thousands", bool(sep))
         self.settings.set("account_path_sep", self.path_sep.text() or ":")
-        self.settings.set("account_sort", self.sort_order.currentData())
         self.accept()
