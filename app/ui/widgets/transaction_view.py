@@ -12,6 +12,9 @@ class TransactionView(QTableView):
 
     transaction_selected = pyqtSignal(int)  # trans_id
     transactions_changed = pyqtSignal()     # refresh needed
+    escape_pressed = pyqtSignal()
+    enter_pressed = pyqtSignal()
+    transaction_cleared = pyqtSignal()
 
     def __init__(self, trans_service: TransactionService, parent=None):
         super().__init__(parent)
@@ -30,11 +33,58 @@ class TransactionView(QTableView):
 
         self.setSortingEnabled(True)
 
+    def setModel(self, model):
+        super().setModel(model)
+        if self.selectionModel() is not None:
+            self.selectionModel().currentRowChanged.connect(self._on_current_row_changed)
+
+    def keyPressEvent(self, event):
+        if self.state() == QAbstractItemView.State.EditingState:
+            super().keyPressEvent(event)
+            return
+        if event.key() == Qt.Key.Key_Escape:
+            self.escape_pressed.emit()
+            event.accept()
+            return
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.enter_pressed.emit()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def moveCursor(self, cursorAction, modifiers):
+        if cursorAction == QAbstractItemView.CursorAction.MoveNext:
+            idx = self.currentIndex()
+            model = self.model()
+            if model is not None and idx.isValid():
+                row = idx.row()
+                col = idx.column()
+                row_count = model.rowCount()
+                col_count = model.columnCount()
+                while True:
+                    col += 1
+                    if col >= col_count:
+                        col = 0
+                        row += 1
+                    if row >= row_count:
+                        break
+                    cand = model.index(row, col)
+                    if model.flags(cand) & Qt.ItemFlag.ItemIsEditable:
+                        return cand
+        return super().moveCursor(cursorAction, modifiers)
+
+    def _on_current_row_changed(self, current: QModelIndex, previous: QModelIndex):
+        if not current.isValid():
+            return
+        self._on_clicked(current)
+
     def _on_clicked(self, index: QModelIndex):
         model: TransactionModel = self.model()
         trans_id = model.get_trans_id(index.row())
         if trans_id:
             self.transaction_selected.emit(trans_id)
+        else:
+            self.transaction_cleared.emit()
 
     def _show_context_menu(self, pos):
         index = self.indexAt(pos)

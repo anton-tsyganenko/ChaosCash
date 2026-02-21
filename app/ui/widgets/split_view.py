@@ -12,6 +12,9 @@ class SplitView(QTableView):
 
     split_changed = pyqtSignal()  # notify parent of changes
 
+    escape_pressed = pyqtSignal()
+
+
     def __init__(self, trans_service: TransactionService, parent=None):
         super().__init__(parent)
         self.trans_service = trans_service
@@ -27,6 +30,66 @@ class SplitView(QTableView):
         header.customContextMenuRequested.connect(self._show_header_menu)
 
         self.setSortingEnabled(True)
+
+
+    def _first_editable_in_row(self, row: int):
+        model = self.model()
+        if model is None:
+            return QModelIndex()
+        for col in range(model.columnCount()):
+            idx = model.index(row, col)
+            if model.flags(idx) & Qt.ItemFlag.ItemIsEditable:
+                return idx
+        return QModelIndex()
+
+    def keyPressEvent(self, event):
+        if self.state() == QAbstractItemView.State.EditingState:
+            if event.key() == Qt.Key.Key_Escape:
+                super().keyPressEvent(event)
+                if self.state() != QAbstractItemView.State.EditingState:
+                    self.escape_pressed.emit()
+                    event.accept()
+                return
+            super().keyPressEvent(event)
+            return
+        if event.key() == Qt.Key.Key_Escape:
+            self.escape_pressed.emit()
+            event.accept()
+            return
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            model = self.model()
+            idx = self.currentIndex()
+            if model is not None and idx.isValid():
+                next_row = idx.row() + 1
+                if next_row < model.rowCount():
+                    next_idx = self._first_editable_in_row(next_row)
+                    if next_idx.isValid():
+                        self.setCurrentIndex(next_idx)
+                        self.edit(next_idx)
+                        event.accept()
+                        return
+        super().keyPressEvent(event)
+
+    def moveCursor(self, cursorAction, modifiers):
+        if cursorAction == QAbstractItemView.CursorAction.MoveNext:
+            idx = self.currentIndex()
+            model = self.model()
+            if model is not None and idx.isValid():
+                row = idx.row()
+                col = idx.column()
+                row_count = model.rowCount()
+                col_count = model.columnCount()
+                while True:
+                    col += 1
+                    if col >= col_count:
+                        col = 0
+                        row += 1
+                    if row >= row_count:
+                        break
+                    cand = model.index(row, col)
+                    if model.flags(cand) & Qt.ItemFlag.ItemIsEditable:
+                        return cand
+        return super().moveCursor(cursorAction, modifiers)
 
     def mousePressEvent(self, event):
         index = self.indexAt(event.pos())

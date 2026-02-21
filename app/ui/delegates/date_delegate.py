@@ -2,7 +2,6 @@
 from PyQt6.QtWidgets import QStyledItemDelegate, QDateTimeEdit
 from PyQt6.QtCore import Qt, QDateTime
 from datetime import datetime, timezone
-import zoneinfo
 
 UTC = timezone.utc
 
@@ -27,6 +26,7 @@ class DateDelegate(QStyledItemDelegate):
         editor = QDateTimeEdit(parent)
         editor.setCalendarPopup(True)
         editor.setDisplayFormat(self._qt_format())
+        editor.setKeyboardTracking(False)
         return editor
 
     def setEditorData(self, editor: QDateTimeEdit, index):
@@ -35,19 +35,25 @@ class DateDelegate(QStyledItemDelegate):
             try:
                 dt_utc = datetime.strptime(utc_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
                 dt_local = dt_utc.astimezone(self._local_tz())
-                qt_dt = QDateTime(dt_local.year, dt_local.month, dt_local.day,
-                                   dt_local.hour, dt_local.minute, dt_local.second)
+                qt_dt = QDateTime(
+                    dt_local.year, dt_local.month, dt_local.day,
+                    dt_local.hour, dt_local.minute, dt_local.second
+                )
                 editor.setDateTime(qt_dt)
+                editor.selectAll()
                 return
             except Exception:
                 pass
         editor.setDateTime(QDateTime.currentDateTime())
+        editor.selectAll()
 
     def setModelData(self, editor: QDateTimeEdit, model, index):
         qt_dt = editor.dateTime()
-        local_dt = datetime(qt_dt.date().year(), qt_dt.date().month(), qt_dt.date().day(),
-                            qt_dt.time().hour(), qt_dt.time().minute(), qt_dt.time().second(),
-                            tzinfo=self._local_tz())
+        local_dt = datetime(
+            qt_dt.date().year(), qt_dt.date().month(), qt_dt.date().day(),
+            qt_dt.time().hour(), qt_dt.time().minute(), qt_dt.time().second(),
+            tzinfo=self._local_tz()
+        )
         utc_str = local_dt.astimezone(UTC).strftime("%Y-%m-%d %H:%M:%S")
         model.setData(index, utc_str, Qt.ItemDataRole.EditRole)
 

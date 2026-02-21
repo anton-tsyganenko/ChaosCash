@@ -1,6 +1,6 @@
 """Account tree view with context menu and drag-and-drop."""
 from PyQt6.QtWidgets import (
-    QTreeView, QMenu, QMessageBox
+    QTreeView, QMenu, QMessageBox, QAbstractItemView
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex
 from PyQt6.QtGui import QAction
@@ -18,6 +18,7 @@ class AccountTreeView(QTreeView):
 
     account_selected = pyqtSignal(list)  # list of account IDs
     virtual_node_selected = pyqtSignal(int)  # virtual node ID
+    enter_pressed = pyqtSignal()
 
     def __init__(self, account_repo: AccountRepo, trans_repo: TransactionRepo,
                  split_repo: SplitRepo, balance_service: BalanceService,
@@ -48,6 +49,39 @@ class AccountTreeView(QTreeView):
         super().setModel(model)
         if model is not None:
             self.selectionModel().selectionChanged.connect(self._on_selection_changed)
+
+
+    def keyPressEvent(self, event):
+        if self.state() == QAbstractItemView.State.EditingState:
+            super().keyPressEvent(event)
+            return
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            self.enter_pressed.emit()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
+    def moveCursor(self, cursorAction, modifiers):
+        if cursorAction == QAbstractItemView.CursorAction.MoveNext:
+            idx = self.currentIndex()
+            model = self.model()
+            if model is not None and idx.isValid():
+                row = idx.row()
+                col = idx.column()
+                parent = idx.parent()
+                row_count = model.rowCount(parent)
+                col_count = model.columnCount(parent)
+                while True:
+                    col += 1
+                    if col >= col_count:
+                        col = 0
+                        row += 1
+                    if row >= row_count:
+                        break
+                    cand = model.index(row, col, parent)
+                    if model.flags(cand) & Qt.ItemFlag.ItemIsEditable:
+                        return cand
+        return super().moveCursor(cursorAction, modifiers)
 
     def _on_clicked(self, index: QModelIndex):
         model: AccountTreeModel = self.model()

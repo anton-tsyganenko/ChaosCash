@@ -3,7 +3,7 @@ import sqlite3
 import os
 from PyQt6.QtWidgets import (
     QMainWindow, QSplitter, QVBoxLayout, QWidget, QHeaderView,
-    QFileDialog, QMessageBox, QApplication, QMenu
+    QFileDialog, QMessageBox, QApplication, QMenu, QAbstractItemView
 )
 from PyQt6.QtCore import Qt, QModelIndex, QTimer, QItemSelectionModel, QSettings
 from PyQt6.QtGui import QAction
@@ -115,6 +115,31 @@ class MainWindow(QMainWindow):
 
         self.transaction_view = TransactionView(self.trans_service)
         self.split_view = SplitView(self.trans_service)
+
+        self.transaction_view.setEditTriggers(
+            QAbstractItemView.EditTrigger.SelectedClicked
+            | QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+            | QAbstractItemView.EditTrigger.AnyKeyPressed
+        )
+        self.split_view.setEditTriggers(
+            QAbstractItemView.EditTrigger.SelectedClicked
+            | QAbstractItemView.EditTrigger.DoubleClicked
+            | QAbstractItemView.EditTrigger.EditKeyPressed
+            | QAbstractItemView.EditTrigger.AnyKeyPressed
+        )
+
+        focus_style = (
+            "QTableView, QTreeView { border: 1px solid #7f8c8d; }"
+            "QTableView:focus, QTreeView:focus { border: 2px solid #1e88e5; }"
+            "QTableView::item:selected, QTreeView::item:selected { background: #8ec5ff; color: #000; }"
+            "QTableView::item:selected:active, QTreeView::item:selected:active { background: #5aaeff; color: #000; }"
+            "QTableView::item:focus, QTreeView::item:focus { border: 2px solid #1e88e5; }"
+            "QTableView::item:selected:focus, QTreeView::item:selected:focus { border: 2px solid #1e88e5; }"
+        )
+        self.account_tree.setStyleSheet(focus_style)
+        self.transaction_view.setStyleSheet(focus_style)
+        self.split_view.setStyleSheet(focus_style)
 
         self.right_splitter.addWidget(self.transaction_view)
         self.right_splitter.addWidget(self.split_view)
@@ -277,9 +302,14 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         self.account_tree.account_selected.connect(self._on_accounts_selected)
         self.account_tree.virtual_node_selected.connect(self._on_virtual_node_selected)
+        self.account_tree.enter_pressed.connect(self._focus_transactions)
         self.transaction_view.transaction_selected.connect(self._on_transaction_selected)
         self.transaction_view.transactions_changed.connect(self._on_transactions_changed)
+        self.transaction_view.transaction_cleared.connect(self._on_transaction_cleared)
+        self.transaction_view.enter_pressed.connect(self._focus_current_transaction_splits)
+        self.transaction_view.escape_pressed.connect(self._focus_accounts)
         self.split_view.split_changed.connect(self._on_split_changed)
+        self.split_view.escape_pressed.connect(self._focus_transactions)
 
         # React to model data changes
         self.split_model.dataChanged.connect(self._on_split_data_changed)
@@ -446,6 +476,31 @@ class MainWindow(QMainWindow):
 
     # --- Slots ---
 
+    # --- Keyboard navigation helpers ---
+
+    def _focus_accounts(self):
+        self.account_tree.setFocus()
+
+    def _focus_transactions(self):
+        self.transaction_view.setFocus()
+
+    def _focus_current_transaction_splits(self):
+        if self._current_trans_id is None:
+            return
+        row = self.transaction_view.currentIndex().row()
+        if row < 0:
+            row = self.trans_model.find_row_for_trans(self._current_trans_id)
+            if row >= 0:
+                self.transaction_view.setCurrentIndex(self.trans_model.index(row, 0))
+        if self.split_model.rowCount() <= 0:
+            return
+        target_row = 0
+        idx = self.split_model.index(target_row, COL_ACCOUNT)
+        if not idx.isValid() or not (self.split_model.flags(idx) & Qt.ItemFlag.ItemIsEditable):
+            idx = self.split_model.index(target_row, 0)
+        self.split_view.setCurrentIndex(idx)
+        self.split_view.setFocus()
+
     def _on_accounts_selected(self, account_ids: list[int]):
         self._new_trans_entry_mode = False
         self._post_reload_focus = None
@@ -476,6 +531,12 @@ class MainWindow(QMainWindow):
         self.trans_model.load_by_ids(trans_ids)
         self.split_model.load(None)
         self._current_trans_id = None
+
+    def _on_transaction_cleared(self):
+        self._new_trans_entry_mode = False
+        self._post_reload_focus = None
+        self._current_trans_id = None
+        self.split_model.load(None)
 
     def _on_transaction_selected(self, trans_id: int):
         self._new_trans_entry_mode = False

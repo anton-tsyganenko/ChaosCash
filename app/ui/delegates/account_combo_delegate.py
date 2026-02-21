@@ -1,7 +1,6 @@
 """Searchable account combo delegate."""
 from PyQt6.QtWidgets import QStyledItemDelegate, QComboBox
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QStandardItemModel, QStandardItem
 from app.repositories.account_repo import AccountRepo
 
 
@@ -33,7 +32,7 @@ class AccountComboDelegate(QStyledItemDelegate):
         result = []
         for acc in all_accs:
             if acc.status == "GRP":
-                continue  # Cannot use GRP accounts in splits
+                continue
             if acc.status == "HID" and not show_hidden:
                 continue
             result.append((acc.id, build_path(acc.id)))
@@ -44,8 +43,7 @@ class AccountComboDelegate(QStyledItemDelegate):
         editor = QComboBox(parent)
         editor.setEditable(True)
         editor.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
-        accounts = self._get_accounts()
-        for acc_id, path in accounts:
+        for acc_id, path in self._get_accounts():
             editor.addItem(path, acc_id)
         editor.completer().setFilterMode(Qt.MatchFlag.MatchContains)
         editor.completer().setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
@@ -56,17 +54,17 @@ class AccountComboDelegate(QStyledItemDelegate):
         for i in range(editor.count()):
             if editor.itemData(i) == account_id:
                 editor.setCurrentIndex(i)
+                editor.lineEdit().selectAll()
                 return
-        # Try display text
         text = index.data(Qt.ItemDataRole.DisplayRole) or ""
         idx = editor.findText(text)
         if idx >= 0:
             editor.setCurrentIndex(idx)
+        editor.lineEdit().selectAll()
 
     def setModelData(self, editor: QComboBox, model, index):
         selected_id = editor.currentData()
         if selected_id is None:
-            # Try to find by text
             text = editor.currentText()
             for i in range(editor.count()):
                 if editor.itemText(i) == text:
