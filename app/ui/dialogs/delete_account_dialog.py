@@ -165,6 +165,9 @@ class DeleteAccountDialog(QDialog):
         self.rb_hide.toggled.connect(self._on_action_changed)
         self.rb_delete.toggled.connect(self._on_action_changed)
 
+        # Initialize UI state (disable sections since Hide is default)
+        self._on_action_changed()
+
     def _check_has_subaccounts(self) -> bool:
         """Check if account has any sub-accounts."""
         children = self.account_repo.get_children(self.exclude_id)

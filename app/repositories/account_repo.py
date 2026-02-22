@@ -86,12 +86,17 @@ class AccountRepo:
 
     def get_account_path(self, account_id: int, separator: str = " / ") -> str:
         """Get full path of account (e.g., 'Assets / Current / Bank Account')."""
-        path = []
+        if account_id is None:
+            return ""
+        acc = self.get_by_id(account_id)
+        if acc is None:
+            return str(account_id)
+        parts = []
         current_id = account_id
         while current_id is not None:
             acc = self.get_by_id(current_id)
             if acc is None:
                 break
-            path.insert(0, acc.name)
+            parts.append(acc.name)
             current_id = acc.parent
-        return separator.join(path)
+        return separator.join(reversed(parts))
