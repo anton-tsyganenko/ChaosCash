@@ -198,19 +198,22 @@ class MainWindow(QMainWindow):
 
         view_menu.addSeparator()
 
-        self.act_verbose = QAction(tr("&Verbose Mode"), self)
-        self.act_verbose.setCheckable(True)
-        self.act_summary = QAction(tr("&Summary Mode"), self)
-        self.act_summary.setCheckable(True)
+        self.act_detailed = QAction(tr("&Detailed"), self)
+        self.act_detailed.setCheckable(True)
+        self.act_detailed.setToolTip(tr("Each row in the transactions table represents a single split."))
+        self.act_aggregated = QAction(tr("&Aggregated"), self)
+        self.act_aggregated.setCheckable(True)
+        self.act_aggregated.setToolTip(tr("Each line shows the total of all splits for the selected account(s), grouped by currency. Zero amounts are hidden."))
 
         mode = self.settings.transaction_view_mode
-        self.act_verbose.setChecked(mode == "verbose")
-        self.act_summary.setChecked(mode == "summary")
+        # Backward compatibility: map old mode names to new ones
+        self.act_detailed.setChecked(mode in ("detailed", "verbose"))
+        self.act_aggregated.setChecked(mode in ("aggregated", "summary"))
 
-        self.act_verbose.triggered.connect(lambda: self._set_view_mode("verbose"))
-        self.act_summary.triggered.connect(lambda: self._set_view_mode("summary"))
-        view_menu.addAction(self.act_verbose)
-        view_menu.addAction(self.act_summary)
+        self.act_detailed.triggered.connect(lambda: self._set_view_mode("detailed"))
+        self.act_aggregated.triggered.connect(lambda: self._set_view_mode("aggregated"))
+        view_menu.addAction(self.act_detailed)
+        view_menu.addAction(self.act_aggregated)
 
         # Tools menu
         tools_menu = menubar.addMenu(tr("&Tools"))
@@ -798,8 +801,9 @@ class MainWindow(QMainWindow):
 
     def _set_view_mode(self, mode: str):
         self.settings.transaction_view_mode = mode
-        self.act_verbose.setChecked(mode == "verbose")
-        self.act_summary.setChecked(mode == "summary")
+        # Backward compatibility: map old mode names to new ones
+        self.act_detailed.setChecked(mode in ("detailed", "verbose"))
+        self.act_aggregated.setChecked(mode in ("aggregated", "summary"))
         self._load_transactions()
 
     def _refresh_integrity(self):

@@ -11,7 +11,7 @@ _DEFAULTS = {
     "thousands_sep": " ",
     "account_path_sep": ":",
     "show_hidden_accounts": False,
-    "transaction_view_mode": "verbose",  # verbose | summary
+    "transaction_view_mode": "detailed",  # detailed | aggregated
 }
 
 

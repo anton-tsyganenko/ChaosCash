@@ -25,7 +25,7 @@ HEADERS = ["ID", tr("Date"), tr("Description"), tr("Amount"), tr("Balance"), tr(
 class TransactionModel(QAbstractTableModel):
     """
     Displays transactions for selected accounts.
-    Supports verbose (per-split) and summary (per-transaction) modes.
+    Supports detailed (per-split) and aggregated (per-transaction) modes.
     Implements canFetchMore/fetchMore for lazy loading.
     Last row is always a phantom (empty) row for entering new transactions.
     """
@@ -61,7 +61,8 @@ class TransactionModel(QAbstractTableModel):
             return
 
         mode = self.settings.transaction_view_mode
-        if mode == "verbose":
+        # Backward compatibility: map old mode names to new ones
+        if mode in ("detailed", "verbose"):
             raw = self.trans_repo.get_verbose_by_accounts(account_ids)
         else:
             raw = self.trans_repo.get_summary_by_accounts(account_ids)
@@ -87,7 +88,7 @@ class TransactionModel(QAbstractTableModel):
             self.endResetModel()
             return
 
-        # Virtual views (imbalance, empty) always use summary: one row per
+        # Virtual views (imbalance, empty) always use aggregated mode: one row per
         # transaction+currency showing the net imbalance.
         raw = self.trans_repo.get_summary_by_ids(trans_ids)
 
@@ -239,7 +240,7 @@ class TransactionModel(QAbstractTableModel):
                 new_date = str(value)
                 trans_id = self._rows[row].get("ID")
 
-                # Keep all rows for the same transaction in sync (verbose mode has
+                # Keep all rows for the same transaction in sync (detailed mode has
                 # multiple rows per transaction).
                 for r in self._all_rows:
                     if r.get("ID") == trans_id:
@@ -255,7 +256,7 @@ class TransactionModel(QAbstractTableModel):
                 trans_id = self._rows[row].get("ID")
 
                 # Keep all rows for the same transaction in sync (applies to
-                # verbose and summary modes when one transaction spans rows).
+                # detailed and aggregated modes when one transaction spans rows).
                 for r in self._all_rows:
                     if r.get("ID") == trans_id:
                         r["Description"] = new_desc
