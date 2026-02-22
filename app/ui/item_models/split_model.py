@@ -1,6 +1,7 @@
 """QAbstractTableModel for splits of the selected transaction."""
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import replace
 import logging
 import math
@@ -99,8 +100,6 @@ class SplitModel(QAbstractTableModel):
         self.endResetModel()
 
     def _add_phantom_rows(self, splits: list[Split]) -> None:
-        from collections import defaultdict
-
         totals: dict[int, int] = defaultdict(int)
         for s in splits:
             totals[s.currency] += s.amount
@@ -166,18 +165,15 @@ class SplitModel(QAbstractTableModel):
         acc = self._accounts.get(account_id)
         if acc is None:
             return str(account_id)
-        return self._build_path(account_id)
-
-    def _build_path(self, account_id: int) -> str:
         parts = []
         cid = account_id
         while cid is not None:
             acc = self._accounts.get(cid)
             if acc is None:
                 break
-            parts.insert(0, acc.name)
+            parts.append(acc.name)
             cid = acc.parent
-        return self.settings.account_path_sep.join(parts)
+        return self.settings.account_path_sep.join(reversed(parts))
 
     def _currency_code(self, currency_id: int | None) -> str:
         if currency_id is None:
@@ -359,14 +355,14 @@ class SplitModel(QAbstractTableModel):
                     changed_roles = [Qt.ItemDataRole.CheckStateRole]
 
             elif col == COL_EXTID and role in (Qt.ItemDataRole.EditRole, Qt.ItemDataRole.DisplayRole):
-                new_ext_id = str(value).strip() or None
+                new_ext_id = str(value)
                 if new_ext_id != split.external_id:
                     row_obj.split = replace(split, external_id=new_ext_id)
                     changed = True
                     changed_roles = [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]
 
             elif col == COL_DESC and role in (Qt.ItemDataRole.EditRole, Qt.ItemDataRole.DisplayRole):
-                new_desc = str(value).strip() or None
+                new_desc = str(value)
                 if new_desc != split.description:
                     row_obj.split = replace(split, description=new_desc)
                     changed = True
