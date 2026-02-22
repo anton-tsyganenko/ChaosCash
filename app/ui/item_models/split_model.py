@@ -196,7 +196,6 @@ class SplitModel(QAbstractTableModel):
             cur.denominator,
             self.settings.decimal_sep,
             self.settings.thousands_sep,
-            self.settings.show_thousands,
         )
 
     def _edit_amt(self, quants: int, currency_id: int | None) -> str:

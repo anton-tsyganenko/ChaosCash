@@ -156,7 +156,6 @@ class TransactionModel(QAbstractTableModel):
             int(quants), int(denominator),
             self.settings.decimal_sep,
             self.settings.thousands_sep,
-            self.settings.show_thousands,
         )
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):

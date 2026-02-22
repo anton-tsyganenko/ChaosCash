@@ -195,7 +195,7 @@ class AccountTreeModel(QAbstractItemModel):
             if cur is None:
                 continue
             from app.utils.amount_math import format_amount
-            parts.append(f"{format_amount(quants, cur.denominator, self.settings.decimal_sep, self.settings.thousands_sep, self.settings.show_thousands)} {cur.code}")
+            parts.append(f"{format_amount(quants, cur.denominator, self.settings.decimal_sep, self.settings.thousands_sep)} {cur.code}")
         return ", ".join(parts)
 
     def headerData(self, section: int, orientation: Qt.Orientation,

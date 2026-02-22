@@ -57,6 +57,5 @@ class SettingsDialog(QDialog):
         self.settings.set("decimal_sep", self.decimal_sep.text() or ".")
         sep = self.thousands_sep.text()
         self.settings.set("thousands_sep", sep)
-        self.settings.set("show_thousands", bool(sep))
         self.settings.set("account_path_sep", self.path_sep.text() or ":")
         self.accept()

@@ -9,7 +9,6 @@ _DEFAULTS = {
     "timezone": "",           # empty = system timezone
     "decimal_sep": ".",
     "thousands_sep": " ",
-    "show_thousands": True,
     "account_path_sep": ":",
     "show_hidden_accounts": False,
     "show_balances": True,
@@ -41,10 +40,6 @@ class AppSettings:
     @property
     def thousands_sep(self) -> str:
         return str(self.get("thousands_sep"))
-
-    @property
-    def show_thousands(self) -> bool:
-        return bool(self.thousands_sep)
 
     @property
     def account_path_sep(self) -> str:
