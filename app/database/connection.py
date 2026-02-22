@@ -1,6 +1,4 @@
 import sqlite3
-from pathlib import Path
-
 
 def open_connection(db_path: str) -> sqlite3.Connection:
     """Open an SQLite connection and apply required pragmas."""

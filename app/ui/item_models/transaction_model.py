@@ -7,7 +7,6 @@ from app.repositories.currency_repo import CurrencyRepo
 from app.utils.amount_math import format_amount
 from app.i18n import tr
 from datetime import datetime, timezone, tzinfo as TZInfo
-import zoneinfo
 
 UTC = timezone.utc
 FETCH_BLOCK = 500
