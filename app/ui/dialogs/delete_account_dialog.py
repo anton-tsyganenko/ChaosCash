@@ -3,8 +3,6 @@ from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout,
     QRadioButton, QButtonGroup, QComboBox, QDialogButtonBox, QGroupBox
 )
-from PyQt6.QtGui import QFont
-from PyQt6.QtCore import Qt
 from app.i18n import tr
 from app.repositories.account_repo import AccountRepo
 from app.repositories.split_repo import SplitRepo
@@ -67,14 +65,7 @@ class DeleteAccountDialog(QDialog):
         self.action_group = QButtonGroup(self)
 
         self.rb_hide = QRadioButton(tr("Hide (recommended for closed accounts)"))
-
-        # Delete option with bold account name
-        delete_label = tr("Delete account ")
-        font = QFont()
-        font.setBold(True)
-        self.rb_delete = QRadioButton(delete_label)
-        # We'll set the bold text in a custom way
-        self.rb_delete.setText(f"Delete account <b>{account_name}</b>")
+        self.rb_delete = QRadioButton(tr(f"Delete account {account_name}"))
 
         self.rb_hide.setChecked(True)
         self.action_group.addButton(self.rb_hide, 0)
