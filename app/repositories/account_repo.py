@@ -74,3 +74,12 @@ class AccountRepo:
     def get_transaction_ids_for_account(self, account_id: int) -> list[int]:
         rows = self.conn.execute(Q.GET_TRANS_IDS_FOR_ACCOUNT, (account_id,)).fetchall()
         return [r[0] for r in rows]
+
+    def get_all_descendants(self, account_id: int) -> list[int]:
+        """Get all descendants of an account (recursive)."""
+        result = []
+        children = self.get_children(account_id)
+        for child in children:
+            result.append(child.id)
+            result.extend(self.get_all_descendants(child.id))
+        return result

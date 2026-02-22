@@ -79,3 +79,8 @@ class SplitRepo:
     def get_splits_with_zero_amount(self) -> list[int]:
         rows = self.conn.execute(Q.CHECK_ZERO_AMOUNTS).fetchall()
         return [r[0] for r in rows]
+
+    def has_splits_for_account(self, account_id: int) -> bool:
+        """Check if an account has any splits."""
+        row = self.conn.execute("SELECT 1 FROM Split WHERE Account=? LIMIT 1", (account_id,)).fetchone()
+        return row is not None
