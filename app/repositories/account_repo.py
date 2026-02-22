@@ -83,3 +83,15 @@ class AccountRepo:
             result.append(child.id)
             result.extend(self.get_all_descendants(child.id))
         return result
+
+    def get_account_path(self, account_id: int, separator: str = " / ") -> str:
+        """Get full path of account (e.g., 'Assets / Current / Bank Account')."""
+        path = []
+        current_id = account_id
+        while current_id is not None:
+            acc = self.get_by_id(current_id)
+            if acc is None:
+                break
+            path.insert(0, acc.name)
+            current_id = acc.parent
+        return separator.join(path)

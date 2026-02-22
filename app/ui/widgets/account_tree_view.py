@@ -190,9 +190,38 @@ class AccountTreeView(QTreeView):
             self.account_repo.update_status(acc.id, "HID")
         elif action == DeleteAccountDialog.DELETE:
             # Handle sub-accounts
-            self._handle_subaccounts(acc.id, dlg)
-            # Handle transactions
-            self._handle_transactions(acc.id, dlg)
+            if dlg.subaccounts_action == DeleteAccountDialog.MOVE_SUBACCOUNTS:
+                # Move direct children to target account
+                target_id = dlg.subaccounts_target_id
+                if target_id is not None:
+                    children = self.account_repo.get_children(acc.id)
+                    for child in children:
+                        self.account_repo.update_parent(child.id, target_id)
+            elif dlg.subaccounts_action == DeleteAccountDialog.DELETE_SUBACCOUNTS:
+                # Delete all sub-accounts recursively
+                self._delete_all_descendants(acc.id)
+
+            # Handle transactions - get list of accounts to process
+            accounts_to_process = [acc.id]
+            if dlg.subaccounts_action != DeleteAccountDialog.DELETE_SUBACCOUNTS:
+                descendants = self.account_repo.get_all_descendants(acc.id)
+                accounts_to_process.extend(descendants)
+
+            if dlg.transactions_action == DeleteAccountDialog.MOVE_SPLITS:
+                target_id = dlg.transactions_target_id
+                if target_id is not None:
+                    for acc_id in accounts_to_process:
+                        self.account_repo.move_splits_to_account(acc_id, target_id)
+            elif dlg.transactions_action == DeleteAccountDialog.DELETE_SPLITS:
+                for acc_id in accounts_to_process:
+                    self.split_repo.delete_by_account(acc_id)
+            elif dlg.transactions_action == DeleteAccountDialog.DELETE_TRANS:
+                trans_ids = set()
+                for acc_id in accounts_to_process:
+                    trans_ids.update(self.account_repo.get_transaction_ids_for_account(acc_id))
+                for tid in trans_ids:
+                    self.trans_repo.delete(tid)
+
             # Delete the account
             self.account_repo.delete(acc.id)
 
@@ -200,79 +229,12 @@ class AccountTreeView(QTreeView):
         model.reload()
         self.expandAll()
 
-    def _handle_subaccounts(self, account_id: int, dlg: DeleteAccountDialog):
-        """Handle sub-accounts based on dialog choice."""
-        if dlg.subaccounts_action == DeleteAccountDialog.DELETE_SUBACCOUNTS:
-            # Delete all sub-accounts recursively
-            self._delete_all_descendants(account_id)
-        elif dlg.subaccounts_action == DeleteAccountDialog.MOVE_SUBACCOUNTS:
-            # Move direct children to target account
-            target_id = dlg.subaccounts_target_id
-            if target_id is not None:
-                children = self.account_repo.get_children(account_id)
-                for child in children:
-                    self.account_repo.update_parent(child.id, target_id)
-
     def _delete_all_descendants(self, account_id: int):
         """Recursively delete all descendants of an account."""
         children = self.account_repo.get_children(account_id)
         for child in children:
             self._delete_all_descendants(child.id)
             self.account_repo.delete(child.id)
-
-    def _handle_transactions(self, account_id: int, dlg: DeleteAccountDialog):
-        """Handle transactions based on dialog choice."""
-        if dlg.transactions_action == DeleteAccountDialog.DELETE_SPLITS:
-            # Delete all splits for account and descendants (if not being deleted)
-            self._delete_splits_for_account_tree(account_id, dlg)
-        elif dlg.transactions_action == DeleteAccountDialog.DELETE_TRANS:
-            # Delete all transactions involving account and descendants (if not being deleted)
-            self._delete_transactions_for_account_tree(account_id, dlg)
-        elif dlg.transactions_action == DeleteAccountDialog.MOVE_SPLITS:
-            # Move splits to target account
-            target_id = dlg.transactions_target_id
-            if target_id is not None:
-                self._move_splits_for_account_tree(account_id, target_id, dlg)
-
-    def _delete_splits_for_account_tree(self, account_id: int, dlg: DeleteAccountDialog):
-        """Delete splits for account and descendants (if not being deleted)."""
-        accounts_to_process = [account_id]
-
-        # Add descendants if they're not being deleted
-        if dlg.subaccounts_action != DeleteAccountDialog.DELETE_SUBACCOUNTS:
-            descendants = self.account_repo.get_all_descendants(account_id)
-            accounts_to_process.extend(descendants)
-
-        for acc_id in accounts_to_process:
-            self.split_repo.delete_by_account(acc_id)
-
-    def _delete_transactions_for_account_tree(self, account_id: int, dlg: DeleteAccountDialog):
-        """Delete transactions for account and descendants (if not being deleted)."""
-        accounts_to_process = [account_id]
-
-        # Add descendants if they're not being deleted
-        if dlg.subaccounts_action != DeleteAccountDialog.DELETE_SUBACCOUNTS:
-            descendants = self.account_repo.get_all_descendants(account_id)
-            accounts_to_process.extend(descendants)
-
-        trans_ids = set()
-        for acc_id in accounts_to_process:
-            trans_ids.update(self.account_repo.get_transaction_ids_for_account(acc_id))
-
-        for tid in trans_ids:
-            self.trans_repo.delete(tid)
-
-    def _move_splits_for_account_tree(self, account_id: int, target_id: int, dlg: DeleteAccountDialog):
-        """Move splits for account and descendants (if not being deleted) to target account."""
-        accounts_to_process = [account_id]
-
-        # Add descendants if they're not being deleted
-        if dlg.subaccounts_action != DeleteAccountDialog.DELETE_SUBACCOUNTS:
-            descendants = self.account_repo.get_all_descendants(account_id)
-            accounts_to_process.extend(descendants)
-
-        for acc_id in accounts_to_process:
-            self.account_repo.move_splits_to_account(acc_id, target_id)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat("application/x-chaoscash-account"):

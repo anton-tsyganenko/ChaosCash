@@ -1,8 +1,9 @@
 """Dialog for deleting an account with multiple options."""
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel,
+    QDialog, QVBoxLayout, QHBoxLayout,
     QRadioButton, QButtonGroup, QComboBox, QDialogButtonBox, QGroupBox
 )
+from PyQt6.QtGui import QFont
 from PyQt6.QtCore import Qt
 from app.i18n import tr
 from app.repositories.account_repo import AccountRepo
@@ -16,25 +17,25 @@ class DeleteAccountDialog(QDialog):
     - Delete account (physically delete from database)
 
     Sub-accounts handling:
-    - Delete recursively
     - Move to another account (default: parent)
+    - Delete recursively
 
     Transactions handling:
+    - Move splits to another account (default: parent)
     - Delete all splits
     - Delete all transactions
-    - Move splits to another account (default: parent)
     """
     HIDE = "hide"
     DELETE = "delete"
 
     # Sub-accounts actions
-    DELETE_SUBACCOUNTS = "delete_subaccounts"
     MOVE_SUBACCOUNTS = "move_subaccounts"
+    DELETE_SUBACCOUNTS = "delete_subaccounts"
 
     # Transactions actions
+    MOVE_SPLITS = "move_splits"
     DELETE_SPLITS = "delete_splits"
     DELETE_TRANS = "delete_trans"
-    MOVE_SPLITS = "move_splits"
 
     def __init__(self, account_name: str, account_repo: AccountRepo,
                  split_repo: SplitRepo, exclude_id: int, parent=None):
@@ -59,7 +60,6 @@ class DeleteAccountDialog(QDialog):
         self._parent_id = account_repo.get_parent_id(exclude_id)
 
         layout = QVBoxLayout(self)
-        layout.addWidget(QLabel(tr(f"What to do with account '{account_name}'?")))
 
         # Action section
         action_group = QGroupBox(tr("Action"))
@@ -67,7 +67,14 @@ class DeleteAccountDialog(QDialog):
         self.action_group = QButtonGroup(self)
 
         self.rb_hide = QRadioButton(tr("Hide (recommended for closed accounts)"))
-        self.rb_delete = QRadioButton(tr(f"Delete account '{account_name}'"))
+
+        # Delete option with bold account name
+        delete_label = tr("Delete account ")
+        font = QFont()
+        font.setBold(True)
+        self.rb_delete = QRadioButton(delete_label)
+        # We'll set the bold text in a custom way
+        self.rb_delete.setText(f"Delete account <b>{account_name}</b>")
 
         self.rb_hide.setChecked(True)
         self.action_group.addButton(self.rb_hide, 0)
@@ -83,14 +90,12 @@ class DeleteAccountDialog(QDialog):
             subaccounts_layout = QVBoxLayout(subaccounts_group)
             self.subaccounts_group = QButtonGroup(self)
 
-            self.rb_delete_recursive = QRadioButton(tr("Delete recursively"))
             self.rb_move_subaccounts = QRadioButton(tr("Move to:"))
+            self.rb_delete_recursive = QRadioButton(tr("Delete recursively"))
 
-            self.subaccounts_group.addButton(self.rb_delete_recursive, 0)
-            self.subaccounts_group.addButton(self.rb_move_subaccounts, 1)
+            self.subaccounts_group.addButton(self.rb_move_subaccounts, 0)
+            self.subaccounts_group.addButton(self.rb_delete_recursive, 1)
             self.rb_move_subaccounts.setChecked(True)
-
-            subaccounts_layout.addWidget(self.rb_delete_recursive)
 
             move_subaccounts_layout = QHBoxLayout()
             move_subaccounts_layout.addWidget(self.rb_move_subaccounts)
@@ -99,12 +104,16 @@ class DeleteAccountDialog(QDialog):
             move_subaccounts_layout.addWidget(self.subaccounts_combo)
             move_subaccounts_layout.addStretch()
             subaccounts_layout.addLayout(move_subaccounts_layout)
+            subaccounts_layout.addWidget(self.rb_delete_recursive)
 
             layout.addWidget(subaccounts_group)
 
             # Connect signals
             self.rb_move_subaccounts.toggled.connect(lambda checked: self.subaccounts_combo.setEnabled(checked))
             self.rb_delete_recursive.toggled.connect(lambda checked: self.subaccounts_combo.setEnabled(not checked))
+            # Update transactions dropdown when sub-accounts action changes
+            self.rb_move_subaccounts.toggled.connect(self._update_transactions_combo)
+            self.rb_delete_recursive.toggled.connect(self._update_transactions_combo)
         else:
             self.subaccounts_group = None
             self.subaccounts_combo = None
@@ -115,17 +124,14 @@ class DeleteAccountDialog(QDialog):
             transactions_layout = QVBoxLayout(transactions_group)
             self.transactions_group = QButtonGroup(self)
 
+            self.rb_move_splits = QRadioButton(tr("Move splits to:"))
             self.rb_delete_splits = QRadioButton(tr("Delete all splits (can create imbalance)"))
             self.rb_delete_trans = QRadioButton(tr("Delete all transactions (can affect balance on other accounts)"))
-            self.rb_move_splits = QRadioButton(tr("Move splits to:"))
 
-            self.transactions_group.addButton(self.rb_delete_splits, 0)
-            self.transactions_group.addButton(self.rb_delete_trans, 1)
-            self.transactions_group.addButton(self.rb_move_splits, 2)
+            self.transactions_group.addButton(self.rb_move_splits, 0)
+            self.transactions_group.addButton(self.rb_delete_splits, 1)
+            self.transactions_group.addButton(self.rb_delete_trans, 2)
             self.rb_move_splits.setChecked(True)
-
-            transactions_layout.addWidget(self.rb_delete_splits)
-            transactions_layout.addWidget(self.rb_delete_trans)
 
             move_splits_layout = QHBoxLayout()
             move_splits_layout.addWidget(self.rb_move_splits)
@@ -134,6 +140,8 @@ class DeleteAccountDialog(QDialog):
             move_splits_layout.addWidget(self.transactions_combo)
             move_splits_layout.addStretch()
             transactions_layout.addLayout(move_splits_layout)
+            transactions_layout.addWidget(self.rb_delete_splits)
+            transactions_layout.addWidget(self.rb_delete_trans)
 
             layout.addWidget(transactions_group)
 
@@ -174,18 +182,6 @@ class DeleteAccountDialog(QDialog):
                 return True
         return False
 
-    def _get_account_full_path(self, account_id: int) -> str:
-        """Get full path of account (e.g., 'Assets / Current / Bank Account')."""
-        path = []
-        current_id = account_id
-        while current_id is not None:
-            acc = self.account_repo.get_by_id(current_id)
-            if acc is None:
-                break
-            path.insert(0, acc.name)
-            current_id = acc.parent
-        return " / ".join(path)
-
     def _populate_subaccounts_combo(self):
         """Populate sub-accounts dropdown with accounts to move to."""
         if self.subaccounts_combo is None:
@@ -202,14 +198,14 @@ class DeleteAccountDialog(QDialog):
         if self._parent_id is not None:
             parent_acc = self.account_repo.get_by_id(self._parent_id)
             if parent_acc:
-                path = self._get_account_full_path(self._parent_id)
+                path = self.account_repo.get_account_path(self._parent_id)
                 self.subaccounts_combo.addItem(path, self._parent_id)
 
         # Add other accounts (excluding the one being deleted and its descendants)
         for acc in accounts:
             if acc.id in descendants or acc.status == "GRP" or acc.status == "HID":
                 continue
-            path = self._get_account_full_path(acc.id)
+            path = self.account_repo.get_account_path(acc.id)
             self.subaccounts_combo.addItem(path, acc.id)
 
     def _populate_transactions_combo(self):
@@ -217,13 +213,14 @@ class DeleteAccountDialog(QDialog):
         if self.transactions_combo is None:
             return
 
+        self.transactions_combo.clear()
         accounts = self.account_repo.get_all()
 
         # Add parent account first (if exists)
         if self._parent_id is not None:
             parent_acc = self.account_repo.get_by_id(self._parent_id)
             if parent_acc:
-                path = self._get_account_full_path(self._parent_id)
+                path = self.account_repo.get_account_path(self._parent_id)
                 self.transactions_combo.addItem(path, self._parent_id)
 
         # Check if we're deleting sub-accounts recursively
@@ -235,17 +232,18 @@ class DeleteAccountDialog(QDialog):
             descendants = set(self.account_repo.get_all_descendants(self.exclude_id))
             descendants.add(self.exclude_id)
         else:
-            descendants = set()
+            descendants = {self.exclude_id}  # Only exclude the account being deleted
 
         # Add other accounts
         for acc in accounts:
-            if acc.id == self.exclude_id or acc.status == "GRP" or acc.status == "HID":
+            if acc.id in descendants or acc.status == "GRP" or acc.status == "HID":
                 continue
-            # Skip descendants if they will be deleted
-            if acc.id in descendants:
-                continue
-            path = self._get_account_full_path(acc.id)
+            path = self.account_repo.get_account_path(acc.id)
             self.transactions_combo.addItem(path, acc.id)
+
+    def _update_transactions_combo(self):
+        """Update transactions dropdown when sub-accounts action changes."""
+        self._populate_transactions_combo()
 
     def _on_action_changed(self):
         """Handle action change to enable/disable sub-sections."""
@@ -274,21 +272,21 @@ class DeleteAccountDialog(QDialog):
 
         # Sub-accounts action
         if self.subaccounts_group is not None:
-            if self.rb_delete_recursive.isChecked():
-                self._subaccounts_action = self.DELETE_SUBACCOUNTS
-            else:
+            if self.rb_move_subaccounts.isChecked():
                 self._subaccounts_action = self.MOVE_SUBACCOUNTS
                 self._subaccounts_target_id = self.subaccounts_combo.currentData()
+            else:
+                self._subaccounts_action = self.DELETE_SUBACCOUNTS
 
         # Transactions action
         if self.transactions_group is not None:
-            if self.rb_delete_splits.isChecked():
-                self._transactions_action = self.DELETE_SPLITS
-            elif self.rb_delete_trans.isChecked():
-                self._transactions_action = self.DELETE_TRANS
-            else:
+            if self.rb_move_splits.isChecked():
                 self._transactions_action = self.MOVE_SPLITS
                 self._transactions_target_id = self.transactions_combo.currentData()
+            elif self.rb_delete_splits.isChecked():
+                self._transactions_action = self.DELETE_SPLITS
+            else:
+                self._transactions_action = self.DELETE_TRANS
 
         self.accept()
 
