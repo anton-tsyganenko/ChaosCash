@@ -78,7 +78,6 @@ class SplitModel(QAbstractTableModel):
 
         self._rows: list[SplitRow] = []
         self._trans_id: int | None = None
-        self._accounts: dict[int, object] = {}
         self._currencies: dict[int, object] = {}
         self._zero_split_ids: set[int] = set()
 
@@ -86,7 +85,6 @@ class SplitModel(QAbstractTableModel):
         self._logger.debug("load trans_id=%r", trans_id)
         self.beginResetModel()
         self._trans_id = trans_id
-        self._accounts = {a.id: a for a in self.account_repo.get_all()}
         self._currencies = {c.id: c for c in self.currency_repo.get_all()}
 
         if trans_id is None:
@@ -159,22 +157,6 @@ class SplitModel(QAbstractTableModel):
             ][section]
         return None
 
-    def _account_name(self, account_id: int | None) -> str:
-        if account_id is None:
-            return ""
-        acc = self._accounts.get(account_id)
-        if acc is None:
-            return str(account_id)
-        parts = []
-        cid = account_id
-        while cid is not None:
-            acc = self._accounts.get(cid)
-            if acc is None:
-                break
-            parts.append(acc.name)
-            cid = acc.parent
-        return self.settings.account_path_sep.join(reversed(parts))
-
     def _currency_code(self, currency_id: int | None) -> str:
         if currency_id is None:
             return ""
@@ -218,14 +200,14 @@ class SplitModel(QAbstractTableModel):
                 if col == COL_CURRENCY:
                     return self._currency_code(row_obj.phantom_currency_id)
                 if col == COL_ACCOUNT:
-                    return self._account_name(row_obj.account_id)
+                    return self.account_repo.get_account_path(row_obj.account_id, self.settings.account_path_sep)
                 if col == COL_DESC:
                     return tr("(imbalanced — select account)")
                 return ""
 
             if row_obj.row_type == ROW_NEW:
                 if col == COL_ACCOUNT:
-                    return self._account_name(row_obj.account_id)
+                    return self.account_repo.get_account_path(row_obj.account_id, self.settings.account_path_sep)
                 if col == COL_AMOUNT:
                     return row_obj.amount_text
                 if col == COL_CURRENCY:
@@ -244,7 +226,7 @@ class SplitModel(QAbstractTableModel):
             if col == COL_DESC:
                 return s.description or ""
             if col == COL_ACCOUNT:
-                return self._account_name(s.account)
+                return self.account_repo.get_account_path(s.account, self.settings.account_path_sep)
             if col == COL_AMOUNT:
                 return self._format_amt(s.amount, s.currency)
             if col == COL_CURRENCY:
@@ -512,7 +494,7 @@ class SplitModel(QAbstractTableModel):
             if column == COL_DESC:
                 return (s.description or "").lower()
             if column == COL_ACCOUNT:
-                return self._account_name(s.account).lower()
+                return self.account_repo.get_account_path(s.account, self.settings.account_path_sep).lower()
             if column == COL_FIXED:
                 return int(bool(s.amount_fixed))
             if column == COL_AMOUNT:
