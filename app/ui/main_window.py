@@ -55,7 +55,7 @@ class MainWindow(QMainWindow):
         ensure_schema(self._conn)
 
         # Repos
-        self.account_repo = AccountRepo(self._conn)
+        self.account_repo = AccountRepo(self._conn, settings)
         self.trans_repo = TransactionRepo(self._conn)
         self.split_repo = SplitRepo(self._conn)
         self.currency_repo = CurrencyRepo(self._conn)

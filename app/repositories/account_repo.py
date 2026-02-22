@@ -16,8 +16,9 @@ def _row_to_account(row) -> Account:
 
 
 class AccountRepo:
-    def __init__(self, conn: sqlite3.Connection):
+    def __init__(self, conn: sqlite3.Connection, settings=None):
         self.conn = conn
+        self.settings = settings
 
     def get_all(self) -> list[Account]:
         rows = self.conn.execute(Q.GET_ALL).fetchall()
@@ -84,13 +85,15 @@ class AccountRepo:
             result.extend(self.get_all_descendants(child.id))
         return result
 
-    def get_account_path(self, account_id: int, separator: str = " / ") -> str:
+    def get_account_path(self, account_id: int) -> str:
         """Get full path of account (e.g., 'Assets / Current / Bank Account')."""
         if account_id is None:
             return ""
         acc = self.get_by_id(account_id)
         if acc is None:
             return str(account_id)
+
+        separator = self.settings.account_path_sep if self.settings else " / "
         parts = []
         current_id = account_id
         while current_id is not None:
