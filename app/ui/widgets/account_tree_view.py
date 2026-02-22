@@ -5,7 +5,9 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex
 from PyQt6.QtGui import QAction
 from app.i18n import tr
-from app.ui.item_models.account_tree_model import AccountTreeModel, VIRTUAL_IMBALANCE_ID, VIRTUAL_EMPTY_ID
+from app.ui.item_models.account_tree_model import (
+    AccountTreeModel, VIRTUAL_IMBALANCE_ID, VIRTUAL_EMPTY_ID
+)
 from app.repositories.account_repo import AccountRepo
 from app.repositories.transaction_repo import TransactionRepo
 from app.repositories.split_repo import SplitRepo

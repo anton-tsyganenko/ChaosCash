@@ -164,7 +164,7 @@ class AccountTreeModel(QAbstractItemModel):
             if col == COL_BALANCE:
                 if role == Qt.ItemDataRole.EditRole:
                     return None
-                if not self.settings.show_balances or node.is_virtual:
+                if node.is_virtual:
                     return ""
                 return self._format_balance(acc.id if not node.is_virtual else None)
             return None

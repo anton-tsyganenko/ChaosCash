@@ -11,7 +11,6 @@ _DEFAULTS = {
     "thousands_sep": " ",
     "account_path_sep": ":",
     "show_hidden_accounts": False,
-    "show_balances": True,
     "transaction_view_mode": "verbose",  # verbose | summary
 }
 
@@ -53,15 +52,6 @@ class AppSettings:
     @show_hidden_accounts.setter
     def show_hidden_accounts(self, value: bool) -> None:
         self.set("show_hidden_accounts", value)
-
-    @property
-    def show_balances(self) -> bool:
-        v = self.get("show_balances")
-        return v if isinstance(v, bool) else v == "true"
-
-    @show_balances.setter
-    def show_balances(self, value: bool) -> None:
-        self.set("show_balances", value)
 
     @property
     def transaction_view_mode(self) -> str:

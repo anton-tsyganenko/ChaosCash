@@ -20,7 +20,6 @@ from app.repositories.currency_repo import CurrencyRepo
 from app.services.balance_service import BalanceService
 from app.services.transaction_service import TransactionService
 from app.services.integrity_service import IntegrityService
-from app.ui.item_models.account_tree_model import AccountTreeModel
 from app.ui.item_models.transaction_model import TransactionModel
 from app.ui.item_models.split_model import (
     SplitModel, ROW_PHANTOM, ROW_NEW, COL_EXTID, COL_DESC, COL_ACCOUNT, COL_FIXED, COL_AMOUNT, COL_CURRENCY
@@ -37,7 +36,9 @@ from app.ui.dialogs.currency_editor_dialog import CurrencyEditorDialog
 from app.utils.recent_files import add_recent_file, get_recent_files
 from app.utils.amount_math import float_to_quants
 from app.utils.expression_parser import safe_eval
-from app.ui.item_models.account_tree_model import VIRTUAL_IMBALANCE_ID, VIRTUAL_EMPTY_ID
+from app.ui.item_models.account_tree_model import (
+    AccountTreeModel, VIRTUAL_IMBALANCE_ID, VIRTUAL_EMPTY_ID
+)
 from datetime import datetime, timezone
 
 UTC = timezone.utc
@@ -194,12 +195,6 @@ class MainWindow(QMainWindow):
         self.act_show_hidden.setChecked(self.settings.show_hidden_accounts)
         self.act_show_hidden.toggled.connect(self._toggle_show_hidden)
         view_menu.addAction(self.act_show_hidden)
-
-        self.act_show_balances = QAction(tr("Show &Balances"), self)
-        self.act_show_balances.setCheckable(True)
-        self.act_show_balances.setChecked(self.settings.show_balances)
-        self.act_show_balances.toggled.connect(self._toggle_show_balances)
-        view_menu.addAction(self.act_show_balances)
 
         view_menu.addSeparator()
 
@@ -800,10 +795,6 @@ class MainWindow(QMainWindow):
         self.settings.show_hidden_accounts = checked
         self.account_model.reload()
         self.account_tree.expandAll()
-
-    def _toggle_show_balances(self, checked: bool):
-        self.settings.show_balances = checked
-        self.account_model.reload()
 
     def _set_view_mode(self, mode: str):
         self.settings.transaction_view_mode = mode
