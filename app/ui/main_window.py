@@ -203,7 +203,8 @@ class MainWindow(QMainWindow):
         self.act_detailed.setToolTip(tr("Each row in the transactions table represents a single split."))
         self.act_aggregated = QAction(tr("&Aggregated"), self)
         self.act_aggregated.setCheckable(True)
-        self.act_aggregated.setToolTip(tr("Each line shows the total of all splits for the selected account(s), grouped by currency. Zero amounts are hidden."))
+        self.act_aggregated.setToolTip(tr("Each row shows the total of all splits for the selected account(s), grouped by currency. Zero amounts are hidden."))
+        view_menu.setToolTipsVisible(True)
 
         mode = self.settings.transaction_view_mode
         self.act_detailed.setChecked(mode == "detailed")
