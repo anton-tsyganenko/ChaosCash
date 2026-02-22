@@ -554,8 +554,8 @@ class MainWindow(QMainWindow):
         self._refresh_integrity()
         self._load_transactions()
 
-    def _on_split_changed(self):
-        if self.split_view.state() == QAbstractItemView.State.EditingState:
+    def _on_split_changed(self, force: bool = False):
+        if not force and self.split_view.state() == QAbstractItemView.State.EditingState:
             QTimer.singleShot(50, self._on_split_changed)
             return
 
@@ -656,15 +656,17 @@ class MainWindow(QMainWindow):
 
     def _on_split_data_changed(self, top_left: QModelIndex, bottom_right: QModelIndex, roles):
         """Handle inline edits in split table."""
+        role_values = {getattr(r, "value", r) for r in (roles or [])}
+        has_edit = Qt.ItemDataRole.EditRole.value in role_values
+        has_check = Qt.ItemDataRole.CheckStateRole.value in role_values
+        has_user = Qt.ItemDataRole.UserRole.value in role_values
+
         # Ignore display-only role updates (e.g. BackgroundRole from set_zero_split_ids)
-        if roles and Qt.ItemDataRole.EditRole not in roles \
-                and Qt.ItemDataRole.CheckStateRole not in roles \
-                and Qt.ItemDataRole.UserRole not in roles:
+        if roles and not has_edit and not has_check and not has_user:
             return
         row = top_left.row()
         col = top_left.column()
-        if col == COL_AMOUNT and roles and Qt.ItemDataRole.EditRole not in roles \
-                and Qt.ItemDataRole.CheckStateRole not in roles:
+        if col == COL_AMOUNT and roles and not has_edit and not has_check:
             return
         model = self.split_model
 
@@ -683,7 +685,7 @@ class MainWindow(QMainWindow):
                     if self._new_trans_entry_mode:
                         self._post_reload_focus = (1, COL_AMOUNT)
                         self._new_trans_entry_mode = False
-                    QTimer.singleShot(0, self._on_split_changed)
+                    QTimer.singleShot(0, lambda: self._on_split_changed(force=True))
             return
 
         if row_type == ROW_NEW:
@@ -706,7 +708,7 @@ class MainWindow(QMainWindow):
                     self.trans_service.recalculate_flexible_splits(
                         amount_quants, cur_id, self._current_trans_id
                     )
-                    QTimer.singleShot(0, self._on_split_changed)
+                    QTimer.singleShot(0, lambda: self._on_split_changed(force=True))
             return
 
         if split is None:
@@ -732,14 +734,14 @@ class MainWindow(QMainWindow):
                     self.trans_service.recalculate_flexible_splits(
                         imbalance, split.currency, self._current_trans_id
                     )
-                QTimer.singleShot(0, self._on_split_changed)
+                QTimer.singleShot(0, lambda: self._on_split_changed(force=True))
             return
 
         # Gather current values from model
         ext_id = model.index(row, COL_EXTID).data() or None
         desc = model.index(row, COL_DESC).data() or None
         acc_id = model.index(row, COL_ACCOUNT).data(Qt.ItemDataRole.UserRole) or split.account
-        amount_str = model.index(row, COL_AMOUNT).data() or "0"
+        amount_str = model.index(row, COL_AMOUNT).data(Qt.ItemDataRole.EditRole) or "0"
         cur_id = model.index(row, COL_CURRENCY).data(Qt.ItemDataRole.UserRole) or split.currency
 
         fixed_state = model.index(row, COL_FIXED).data(Qt.ItemDataRole.CheckStateRole)
@@ -758,12 +760,9 @@ class MainWindow(QMainWindow):
             cur = self.currency_repo.get_by_id(cur_id)
             denom = cur.denominator if cur else 100
             amount_quants = float_to_quants(amount_float, denom)
-
-            prev_amount_text = model._format_amt(split.amount, split.currency)
-            raw_amount_input = model.index(row, COL_AMOUNT).data(Qt.ItemDataRole.UserRole)
-            edited_text = raw_amount_input if isinstance(raw_amount_input, str) else amount_str
-            if str(edited_text).strip() != str(prev_amount_text).strip():
-                amount_fixed = True
+            # Manual amount edit always makes this split fixed; otherwise
+            # subsequent rebalance can immediately redistribute the change back.
+            amount_fixed = True
 
         self.trans_service.update_split(
             split.id, acc_id, cur_id, desc, ext_id, amount_quants, amount_fixed
@@ -795,7 +794,7 @@ class MainWindow(QMainWindow):
                     imbalance, affected_currency, self._current_trans_id
                 )
 
-        QTimer.singleShot(0, self._on_split_changed)
+        QTimer.singleShot(0, lambda: self._on_split_changed(force=True))
 
     def _toggle_show_hidden(self, checked: bool):
         self.settings.show_hidden_accounts = checked

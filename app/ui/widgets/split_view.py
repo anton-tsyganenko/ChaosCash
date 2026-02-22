@@ -90,18 +90,6 @@ class SplitView(QTableView):
 
     def mousePressEvent(self, event):
         self._logger.debug("mousePressEvent button=%s buttons=%s x=%s y=%s row=%s col=%s", int(event.button().value), int(event.buttons().value), event.position().x(), event.position().y(), self.indexAt(event.pos()).row() if self.indexAt(event.pos()).isValid() else -1, self.indexAt(event.pos()).column() if self.indexAt(event.pos()).isValid() else -1)
-        index = self.indexAt(event.pos())
-        if (index.isValid()
-                and index.column() == COL_FIXED
-                and event.button() == Qt.MouseButton.LeftButton):
-            model: SplitModel = self.model()
-            if model and model.get_row_type(index.row()) == ROW_REAL:
-                current = index.data(Qt.ItemDataRole.CheckStateRole)
-                if current is not None:
-                    new_state = (Qt.CheckState.Unchecked
-                                 if current == Qt.CheckState.Checked
-                                 else Qt.CheckState.Checked)
-                    model.setData(index, new_state, Qt.ItemDataRole.CheckStateRole)
         super().mousePressEvent(event)
 
     def _show_context_menu(self, pos):
