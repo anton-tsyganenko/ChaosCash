@@ -206,9 +206,8 @@ class MainWindow(QMainWindow):
         self.act_aggregated.setToolTip(tr("Each line shows the total of all splits for the selected account(s), grouped by currency. Zero amounts are hidden."))
 
         mode = self.settings.transaction_view_mode
-        # Backward compatibility: map old mode names to new ones
-        self.act_detailed.setChecked(mode in ("detailed", "verbose"))
-        self.act_aggregated.setChecked(mode in ("aggregated", "summary"))
+        self.act_detailed.setChecked(mode == "detailed")
+        self.act_aggregated.setChecked(mode == "aggregated")
 
         self.act_detailed.triggered.connect(lambda: self._set_view_mode("detailed"))
         self.act_aggregated.triggered.connect(lambda: self._set_view_mode("aggregated"))
@@ -801,9 +800,8 @@ class MainWindow(QMainWindow):
 
     def _set_view_mode(self, mode: str):
         self.settings.transaction_view_mode = mode
-        # Backward compatibility: map old mode names to new ones
-        self.act_detailed.setChecked(mode in ("detailed", "verbose"))
-        self.act_aggregated.setChecked(mode in ("aggregated", "summary"))
+        self.act_detailed.setChecked(mode == "detailed")
+        self.act_aggregated.setChecked(mode == "aggregated")
         self._load_transactions()
 
     def _refresh_integrity(self):

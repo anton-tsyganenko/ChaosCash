@@ -61,8 +61,7 @@ class TransactionModel(QAbstractTableModel):
             return
 
         mode = self.settings.transaction_view_mode
-        # Backward compatibility: map old mode names to new ones
-        if mode in ("detailed", "verbose"):
+        if mode == "detailed":
             raw = self.trans_repo.get_verbose_by_accounts(account_ids)
         else:
             raw = self.trans_repo.get_summary_by_accounts(account_ids)
