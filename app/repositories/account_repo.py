@@ -11,7 +11,7 @@ def _row_to_account(row) -> Account:
         code=row["Code"],
         description=row["Description"],
         external_id=row["ExternalID"],
-        status=row["Status"],
+        is_hidden=bool(row["IsHidden"]),
     )
 
 
@@ -41,22 +41,22 @@ class AccountRepo:
         return acc.parent if acc else None
 
     def insert(self, parent: int | None, name: str, code: str | None,
-               description: str | None, external_id: str | None, status: str = "ACT") -> int:
-        cur = self.conn.execute(Q.INSERT, (parent, name, code, description, external_id, status))
+               description: str | None, external_id: str | None, is_hidden: bool = False) -> int:
+        cur = self.conn.execute(Q.INSERT, (parent, name, code, description, external_id, int(is_hidden)))
         self.conn.commit()
         return cur.lastrowid
 
     def update(self, account_id: int, parent: int | None, name: str, code: str | None,
-               description: str | None, external_id: str | None, status: str) -> None:
-        self.conn.execute(Q.UPDATE, (parent, name, code, description, external_id, status, account_id))
+               description: str | None, external_id: str | None, is_hidden: bool) -> None:
+        self.conn.execute(Q.UPDATE, (parent, name, code, description, external_id, int(is_hidden), account_id))
         self.conn.commit()
 
     def update_parent(self, account_id: int, new_parent: int | None) -> None:
         self.conn.execute(Q.UPDATE_PARENT, (new_parent, account_id))
         self.conn.commit()
 
-    def update_status(self, account_id: int, status: str) -> None:
-        self.conn.execute(Q.UPDATE_STATUS, (status, account_id))
+    def update_hidden(self, account_id: int, is_hidden: bool) -> None:
+        self.conn.execute(Q.UPDATE_HIDDEN, (int(is_hidden), account_id))
         self.conn.commit()
 
     def delete(self, account_id: int) -> None:

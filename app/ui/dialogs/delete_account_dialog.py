@@ -6,12 +6,13 @@ from PyQt6.QtWidgets import (
 from app.i18n import tr
 from app.repositories.account_repo import AccountRepo
 from app.repositories.split_repo import SplitRepo
+from app.ui.account_selection import get_selectable_account_items
 
 
 class DeleteAccountDialog(QDialog):
     """
     Options:
-    - Hide account (Status -> HID)
+    - Hide account
     - Delete account (physically delete from database)
 
     Sub-accounts handling:
@@ -36,13 +37,14 @@ class DeleteAccountDialog(QDialog):
     DELETE_TRANS = "delete_trans"
 
     def __init__(self, account_name: str, account_repo: AccountRepo,
-                 split_repo: SplitRepo, exclude_id: int, parent=None):
+                 split_repo: SplitRepo, settings, exclude_id: int, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("Delete Account"))
         self.setModal(True)
         self.account_repo = account_repo
         self.split_repo = split_repo
         self.exclude_id = exclude_id
+        self.settings = settings
 
         self._action = self.HIDE
         self._subaccounts_action = self.MOVE_SUBACCOUNTS
@@ -181,26 +183,26 @@ class DeleteAccountDialog(QDialog):
         if self.subaccounts_combo is None:
             return
 
-        # Get all descendants of the account being deleted
+        self.subaccounts_combo.clear()
         descendants = set(self.account_repo.get_all_descendants(self.exclude_id))
         descendants.add(self.exclude_id)
 
-        # Get all accounts
-        accounts = self.account_repo.get_all()
-
-        # Add parent account first (if exists)
-        if self._parent_id is not None:
+        if self._parent_id is not None and self._parent_id not in descendants:
             parent_acc = self.account_repo.get_by_id(self._parent_id)
             if parent_acc:
                 path = self.account_repo.get_account_path(self._parent_id)
                 self.subaccounts_combo.addItem(path, self._parent_id)
 
-        # Add other accounts (excluding the one being deleted and its descendants)
-        for acc in accounts:
-            if acc.id in descendants or acc.status == "GRP" or acc.status == "HID":
-                continue
-            path = self.account_repo.get_account_path(acc.id)
-            self.subaccounts_combo.addItem(path, acc.id)
+        excluded_ids = set(descendants)
+        if self._parent_id is not None:
+            excluded_ids.add(self._parent_id)
+        items = get_selectable_account_items(
+            self.account_repo,
+            self.settings,
+            exclude_ids=excluded_ids,
+        )
+        for path, account_id in items:
+            self.subaccounts_combo.addItem(path, account_id)
 
     def _populate_transactions_combo(self):
         """Populate transactions dropdown with accounts to move splits to."""
@@ -208,32 +210,32 @@ class DeleteAccountDialog(QDialog):
             return
 
         self.transactions_combo.clear()
-        accounts = self.account_repo.get_all()
 
-        # Add parent account first (if exists)
-        if self._parent_id is not None:
+        delete_subaccounts = (self.subaccounts_group is not None and
+                             self.rb_delete_recursive.isChecked())
+
+        if delete_subaccounts:
+            descendants = set(self.account_repo.get_all_descendants(self.exclude_id))
+            descendants.add(self.exclude_id)
+        else:
+            descendants = {self.exclude_id}
+
+        if self._parent_id is not None and self._parent_id not in descendants:
             parent_acc = self.account_repo.get_by_id(self._parent_id)
             if parent_acc:
                 path = self.account_repo.get_account_path(self._parent_id)
                 self.transactions_combo.addItem(path, self._parent_id)
 
-        # Check if we're deleting sub-accounts recursively
-        delete_subaccounts = (self.subaccounts_group is not None and
-                             self.rb_delete_recursive.isChecked())
-
-        if delete_subaccounts:
-            # Get descendants to exclude
-            descendants = set(self.account_repo.get_all_descendants(self.exclude_id))
-            descendants.add(self.exclude_id)
-        else:
-            descendants = {self.exclude_id}  # Only exclude the account being deleted
-
-        # Add other accounts
-        for acc in accounts:
-            if acc.id in descendants or acc.status == "GRP" or acc.status == "HID":
-                continue
-            path = self.account_repo.get_account_path(acc.id)
-            self.transactions_combo.addItem(path, acc.id)
+        excluded_ids = set(descendants)
+        if self._parent_id is not None:
+            excluded_ids.add(self._parent_id)
+        items = get_selectable_account_items(
+            self.account_repo,
+            self.settings,
+            exclude_ids=excluded_ids,
+        )
+        for path, account_id in items:
+            self.transactions_combo.addItem(path, account_id)
 
     def _update_transactions_combo(self):
         """Update transactions dropdown when sub-accounts action changes."""

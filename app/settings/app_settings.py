@@ -11,6 +11,7 @@ _DEFAULTS = {
     "thousands_sep": " ",
     "account_path_sep": ":",
     "show_hidden_accounts": False,
+    "allow_grouping_accounts_for_splits": False,
     "transaction_view_mode": "detailed",  # detailed | aggregated
 }
 
@@ -53,6 +54,15 @@ class AppSettings:
     def show_hidden_accounts(self, value: bool) -> None:
         self.set("show_hidden_accounts", value)
 
+
+    @property
+    def allow_grouping_accounts_for_splits(self) -> bool:
+        v = self.get("allow_grouping_accounts_for_splits")
+        return v if isinstance(v, bool) else v == "true"
+
+    @allow_grouping_accounts_for_splits.setter
+    def allow_grouping_accounts_for_splits(self, value: bool) -> None:
+        self.set("allow_grouping_accounts_for_splits", value)
     @property
     def transaction_view_mode(self) -> str:
         return str(self.get("transaction_view_mode"))

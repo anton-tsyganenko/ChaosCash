@@ -39,14 +39,14 @@ def balance_service(repos):
 
 
 def test_empty_account_balance(repos, balance_service):
-    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, False)
     balance = balance_service.get_balance(acc_id)
     assert balance == {}
 
 
 def test_single_currency_balance(repos, balance_service):
     cur_id = repos["currency"].insert("USD", "CURR", "US Dollar", 100)
-    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, False)
     trans_id = repos["trans"].insert("2024-01-01 00:00:00", "Test")
     repos["split"].insert(trans_id, acc_id, cur_id, None, None, 10000)  # 100.00 USD
 
@@ -57,7 +57,7 @@ def test_single_currency_balance(repos, balance_service):
 def test_multi_currency_balance(repos, balance_service):
     usd_id = repos["currency"].insert("USD", "CURR", "US Dollar", 100)
     eur_id = repos["currency"].insert("EUR", "CURR", "Euro", 100)
-    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, False)
     trans_id = repos["trans"].insert("2024-01-01 00:00:00", "Test")
     repos["split"].insert(trans_id, acc_id, usd_id, None, None, 5000)
     repos["split"].insert(trans_id, acc_id, eur_id, None, None, 3000)
@@ -69,9 +69,9 @@ def test_multi_currency_balance(repos, balance_service):
 
 def test_grp_account_balance(repos, balance_service):
     cur_id = repos["currency"].insert("USD", "CURR", "US Dollar", 100)
-    parent_id = repos["account"].insert(None, "Assets", None, None, None, "GRP")
-    child1_id = repos["account"].insert(parent_id, "Cash", None, None, None, "ACT")
-    child2_id = repos["account"].insert(parent_id, "Bank", None, None, None, "ACT")
+    parent_id = repos["account"].insert(None, "Assets", None, None, None, False)
+    child1_id = repos["account"].insert(parent_id, "Cash", None, None, None, False)
+    child2_id = repos["account"].insert(parent_id, "Bank", None, None, None, False)
 
     trans_id = repos["trans"].insert("2024-01-01 00:00:00", "Test")
     repos["split"].insert(trans_id, child1_id, cur_id, None, None, 10000)
@@ -83,7 +83,7 @@ def test_grp_account_balance(repos, balance_service):
 
 def test_cache_invalidation(repos, balance_service):
     cur_id = repos["currency"].insert("USD", "CURR", "US Dollar", 100)
-    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, False)
     trans_id = repos["trans"].insert("2024-01-01 00:00:00", "Test")
     split_id = repos["split"].insert(trans_id, acc_id, cur_id, None, None, 10000)
 

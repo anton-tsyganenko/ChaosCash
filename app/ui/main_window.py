@@ -196,6 +196,12 @@ class MainWindow(QMainWindow):
         self.act_show_hidden.toggled.connect(self._toggle_show_hidden)
         view_menu.addAction(self.act_show_hidden)
 
+        self.act_allow_grouping_for_splits = QAction(tr("Allow grouping accounts for splits"), self)
+        self.act_allow_grouping_for_splits.setCheckable(True)
+        self.act_allow_grouping_for_splits.setChecked(self.settings.allow_grouping_accounts_for_splits)
+        self.act_allow_grouping_for_splits.toggled.connect(self._toggle_allow_grouping_for_splits)
+        view_menu.addAction(self.act_allow_grouping_for_splits)
+
         view_menu.addSeparator()
 
         self.act_detailed = QAction(tr("&Detailed"), self)
@@ -240,10 +246,11 @@ class MainWindow(QMainWindow):
             hdr.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
         hdr.resizeSection(0, 220)
         hdr.resizeSection(1, 130)
-        hdr.resizeSection(2, 90)
-        hdr.resizeSection(3, 120)
-        hdr.resizeSection(4, 220)
-        hdr.resizeSection(5, 70)
+        hdr.resizeSection(2, 130)
+        hdr.resizeSection(3, 60)
+        hdr.resizeSection(4, 90)
+        hdr.resizeSection(5, 120)
+        hdr.resizeSection(6, 220)
 
         # Transaction model
         self.trans_model = TransactionModel(
@@ -391,7 +398,7 @@ class MainWindow(QMainWindow):
         self._apply_display_settings(
             self.account_tree, self.account_tree.header(), self._acc_display,
             default_order=list(range(self.account_model.columnCount())),
-            default_widths={0: 220, 1: 130, 2: 90, 3: 120, 4: 220, 5: 70},
+            default_widths={0: 220, 1: 130, 2: 130, 3: 60, 4: 90, 5: 120, 6: 220},
             default_hidden=[],
             default_sort_col=0,
             default_sort_order=Qt.SortOrder.AscendingOrder,
@@ -798,6 +805,9 @@ class MainWindow(QMainWindow):
         self.settings.show_hidden_accounts = checked
         self.account_model.reload()
         self.account_tree.expandAll()
+
+    def _toggle_allow_grouping_for_splits(self, checked: bool):
+        self.settings.allow_grouping_accounts_for_splits = checked
 
     def _set_view_mode(self, mode: str):
         self.settings.transaction_view_mode = mode

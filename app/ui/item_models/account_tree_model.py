@@ -1,7 +1,7 @@
 """QAbstractItemModel for the account hierarchy tree."""
 from __future__ import annotations
 from PyQt6.QtCore import Qt, QModelIndex, QAbstractItemModel
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QColor
 from app.models.account import Account
 from app.repositories.account_repo import AccountRepo
 from app.services.balance_service import BalanceService
@@ -9,12 +9,13 @@ from app.repositories.currency_repo import CurrencyRepo
 from app.i18n import tr
 
 COL_NAME = 0
-COL_BALANCE = 1
-COL_CODE = 2
-COL_EXTERNAL_ID = 3
-COL_DESCRIPTION = 4
-COL_STATUS = 5
-NUM_COLS = 6
+COL_TOTAL_BALANCE = 1
+COL_OWN_BALANCE = 2
+COL_HIDDEN = 3
+COL_CODE = 4
+COL_EXTERNAL_ID = 5
+COL_DESCRIPTION = 6
+NUM_COLS = 7
 
 VIRTUAL_IMBALANCE_ID = -1
 VIRTUAL_EMPTY_ID = -2
@@ -63,13 +64,12 @@ class AccountTreeModel(QAbstractItemModel):
         self.endResetModel()
 
     def _build_tree(self) -> None:
-        show_hidden = self.settings.show_hidden_accounts
-        nodes: dict[int, AccountNode] = {}
+        all_accounts = self.account_repo.get_all()
+        nodes: dict[int, AccountNode] = {acc.id: AccountNode(acc, None) for acc in all_accounts}
 
-        for acc in self.account_repo.get_all():
-            if acc.status == "HID" and not show_hidden:
-                continue
-            nodes[acc.id] = AccountNode(acc, None)
+        if not self.settings.show_hidden_accounts:
+            hidden_ids = self._compute_hidden_subtree_ids(all_accounts)
+            nodes = {aid: n for aid, n in nodes.items() if aid not in hidden_ids}
 
         for node in nodes.values():
             acc = node.account
@@ -89,6 +89,26 @@ class AccountTreeModel(QAbstractItemModel):
                 sort_recursive(child)
 
         sort_recursive(self._root)
+
+    def _compute_hidden_subtree_ids(self, all_accounts: list[Account]) -> set[int]:
+        children: dict[int, list[int]] = {}
+        for acc in all_accounts:
+            if acc.parent is not None:
+                children.setdefault(acc.parent, []).append(acc.id)
+
+        hidden: set[int] = {acc.id for acc in all_accounts if acc.is_hidden}
+
+        def mark_hidden_descendants(account_id: int) -> None:
+            for child_id in children.get(account_id, []):
+                if child_id in hidden:
+                    mark_hidden_descendants(child_id)
+                    continue
+                hidden.add(child_id)
+                mark_hidden_descendants(child_id)
+
+        for hidden_id in list(hidden):
+            mark_hidden_descendants(hidden_id)
+        return hidden
 
     def _add_virtual_nodes(self) -> None:
         if self._show_imbalance:
@@ -159,34 +179,30 @@ class AccountTreeModel(QAbstractItemModel):
                 return acc.external_id or ""
             if col == COL_DESCRIPTION:
                 return acc.description or ""
-            if col == COL_STATUS:
-                return acc.status or ""
-            if col == COL_BALANCE:
-                if role == Qt.ItemDataRole.EditRole:
-                    return None
-                if node.is_virtual:
-                    return ""
-                return self._format_balance(acc.id if not node.is_virtual else None)
+            if col == COL_TOTAL_BALANCE:
+                if role == Qt.ItemDataRole.EditRole or node.is_virtual:
+                    return None if role == Qt.ItemDataRole.EditRole else ""
+                return self._format_balance(acc.id, include_children=True)
+            if col == COL_OWN_BALANCE:
+                if role == Qt.ItemDataRole.EditRole or node.is_virtual:
+                    return None if role == Qt.ItemDataRole.EditRole else ""
+                return self._format_balance(acc.id, include_children=False)
             return None
+
+        if role == Qt.ItemDataRole.CheckStateRole and col == COL_HIDDEN and not node.is_virtual:
+            return Qt.CheckState.Checked if acc.is_hidden else Qt.CheckState.Unchecked
 
         if role == Qt.ItemDataRole.UserRole:
             return acc.id if not node.is_virtual else node.virtual_id
 
-        if role == Qt.ItemDataRole.FontRole and acc.status == "GRP":
-            font = QFont()
-            font.setBold(True)
-            return font
-
-        if role == Qt.ItemDataRole.ForegroundRole:
-            from PyQt6.QtGui import QColor
-            if acc.status == "HID":
-                return QColor(150, 150, 150)
+        if role == Qt.ItemDataRole.ForegroundRole and acc.is_hidden:
+            return QColor(150, 150, 150)
         return None
 
-    def _format_balance(self, account_id: int | None) -> str:
+    def _format_balance(self, account_id: int | None, include_children: bool) -> str:
         if account_id is None or account_id < 0:
             return ""
-        balance = self.balance_service.get_balance(account_id)
+        balance = self.balance_service.get_balance(account_id, include_children=include_children)
         parts = []
         for cid, quants in balance.items():
             if quants == 0:
@@ -202,8 +218,8 @@ class AccountTreeModel(QAbstractItemModel):
                    role: int = Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return [
-                tr("Account"), tr("Balance"), tr("Code"),
-                tr("Ext. ID"), tr("Description"), tr("Status"),
+                tr("Account"), tr("Total Balance"), tr("Own Balance"), tr("Hidden"),
+                tr("Code"), tr("Ext. ID"), tr("Description"),
             ][section]
         return None
 
@@ -216,16 +232,32 @@ class AccountTreeModel(QAbstractItemModel):
             base |= Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsDropEnabled
             if index.column() in (COL_NAME, COL_CODE, COL_EXTERNAL_ID, COL_DESCRIPTION):
                 base |= Qt.ItemFlag.ItemIsEditable
+            if index.column() == COL_HIDDEN:
+                base |= Qt.ItemFlag.ItemIsUserCheckable
         return base
 
     def setData(self, index: QModelIndex, value, role: int = Qt.ItemDataRole.EditRole) -> bool:
-        if not index.isValid() or role != Qt.ItemDataRole.EditRole:
+        if not index.isValid():
             return False
         node: AccountNode = index.internalPointer()
         if node.is_virtual:
             return False
         acc = node.account
         col = index.column()
+
+        if col == COL_HIDDEN and role == Qt.ItemDataRole.CheckStateRole:
+            raw_value = getattr(value, "value", value)
+            is_hidden = int(raw_value) == int(Qt.CheckState.Checked.value)
+            self.account_repo.update_hidden(acc.id, is_hidden)
+            updated = self.account_repo.get_by_id(acc.id)
+            if updated:
+                node.account = updated
+                self._id_to_node[acc.id] = node
+            self.dataChanged.emit(index, index, [role])
+            return True
+
+        if role != Qt.ItemDataRole.EditRole:
+            return False
 
         name = acc.name
         code = acc.code
@@ -246,7 +278,7 @@ class AccountTreeModel(QAbstractItemModel):
         else:
             return False
 
-        self.account_repo.update(acc.id, acc.parent, name, code, desc, ext, acc.status)
+        self.account_repo.update(acc.id, acc.parent, name, code, desc, ext, acc.is_hidden)
         updated = self.account_repo.get_by_id(acc.id)
         if updated:
             node.account = updated
@@ -284,16 +316,18 @@ class AccountTreeModel(QAbstractItemModel):
                 return ""
             if column == COL_NAME:
                 return (a.name or "").lower()
-            if column == COL_BALANCE:
-                return sum(self.balance_service.get_balance(a.id).values())
+            if column == COL_TOTAL_BALANCE:
+                return sum(self.balance_service.get_balance(a.id, include_children=True).values())
+            if column == COL_OWN_BALANCE:
+                return sum(self.balance_service.get_balance(a.id, include_children=False).values())
+            if column == COL_HIDDEN:
+                return int(a.is_hidden)
             if column == COL_CODE:
                 return (a.code or "").lower()
             if column == COL_EXTERNAL_ID:
                 return (a.external_id or "").lower()
             if column == COL_DESCRIPTION:
                 return (a.description or "").lower()
-            if column == COL_STATUS:
-                return (a.status or "").lower()
             return (a.name or "").lower()
 
         def sort_recursive(node: AccountNode):
@@ -321,7 +355,7 @@ class AccountTreeModel(QAbstractItemModel):
         if node is None:
             return result
         for child in node.children:
-            if child.account and child.account.status == "HID" and not include_hidden:
+            if child.account and child.account.is_hidden and not include_hidden:
                 continue
             if child.account:
                 result.append(child.account.id)
@@ -331,4 +365,4 @@ class AccountTreeModel(QAbstractItemModel):
 
 def _make_virtual_account(virtual_id: int, name: str) -> Account:
     return Account(id=virtual_id, parent=None, name=name, code=None,
-                   description=None, external_id=None, status="GRP")
+                   description=None, external_id=None, is_hidden=False)

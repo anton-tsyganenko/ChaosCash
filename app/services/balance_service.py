@@ -5,11 +5,7 @@ from app.repositories.split_repo import SplitRepo
 
 
 class BalanceService:
-    """
-    Calculates and caches account balances.
-
-    GRP accounts are computed recursively from children.
-    """
+    """Calculates and caches account balances."""
 
     def __init__(self, account_repo: AccountRepo, split_repo: SplitRepo):
         self.account_repo = account_repo
@@ -30,17 +26,19 @@ class BalanceService:
         for child in self.account_repo.get_children(account_id):
             self.invalidate_account_tree(child.id)
 
-    def get_balance(self, account_id: int) -> dict[int, int]:
-        """Return {currency_id: total_quants} for account (recursive for GRP)."""
-        children = self.account_repo.get_children(account_id)
-        if not children:
+    def get_balance(self, account_id: int, include_children: bool = True) -> dict[int, int]:
+        """Return {currency_id: total_quants} for account."""
+        if not include_children:
             return self._get_leaf_balance(account_id)
-        else:
-            result: dict[int, int] = defaultdict(int)
-            for child in children:
-                for cid, quants in self.get_balance(child.id).items():
-                    result[cid] += quants
-            return dict(result)
+
+        result: dict[int, int] = defaultdict(int)
+        for cid, quants in self._get_leaf_balance(account_id).items():
+            result[cid] += quants
+
+        for child in self.account_repo.get_children(account_id):
+            for cid, quants in self.get_balance(child.id, include_children=True).items():
+                result[cid] += quants
+        return dict(result)
 
     def _get_leaf_balance(self, account_id: int) -> dict[int, int]:
         if account_id in self._leaf_cache:

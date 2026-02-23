@@ -1,20 +1,20 @@
 """Raw SQL queries for accounts."""
 
-GET_ALL = "SELECT ID, Parent, Name, Code, Description, ExternalID, Status FROM Account ORDER BY Name"
+GET_ALL = "SELECT ID, Parent, Name, Code, Description, ExternalID, IsHidden FROM Account ORDER BY Name"
 
-GET_BY_ID = "SELECT ID, Parent, Name, Code, Description, ExternalID, Status FROM Account WHERE ID = ?"
+GET_BY_ID = "SELECT ID, Parent, Name, Code, Description, ExternalID, IsHidden FROM Account WHERE ID = ?"
 
-GET_CHILDREN = "SELECT ID, Parent, Name, Code, Description, ExternalID, Status FROM Account WHERE Parent = ? ORDER BY Name"
+GET_CHILDREN = "SELECT ID, Parent, Name, Code, Description, ExternalID, IsHidden FROM Account WHERE Parent = ? ORDER BY Name"
 
-GET_ROOT = "SELECT ID, Parent, Name, Code, Description, ExternalID, Status FROM Account WHERE Parent IS NULL ORDER BY Name"
+GET_ROOT = "SELECT ID, Parent, Name, Code, Description, ExternalID, IsHidden FROM Account WHERE Parent IS NULL ORDER BY Name"
 
-INSERT = "INSERT INTO Account (Parent, Name, Code, Description, ExternalID, Status) VALUES (?, ?, ?, ?, ?, ?)"
+INSERT = "INSERT INTO Account (Parent, Name, Code, Description, ExternalID, IsHidden) VALUES (?, ?, ?, ?, ?, ?)"
 
-UPDATE = "UPDATE Account SET Parent=?, Name=?, Code=?, Description=?, ExternalID=?, Status=? WHERE ID=?"
+UPDATE = "UPDATE Account SET Parent=?, Name=?, Code=?, Description=?, ExternalID=?, IsHidden=? WHERE ID=?"
 
 UPDATE_PARENT = "UPDATE Account SET Parent=? WHERE ID=?"
 
-UPDATE_STATUS = "UPDATE Account SET Status=? WHERE ID=?"
+UPDATE_HIDDEN = "UPDATE Account SET IsHidden=? WHERE ID=?"
 
 DELETE = "DELETE FROM Account WHERE ID=?"
 

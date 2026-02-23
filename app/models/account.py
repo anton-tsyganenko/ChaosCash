@@ -9,4 +9,4 @@ class Account:
     code: str | None
     description: str | None
     external_id: str | None
-    status: str  # ACT, HID, GRP
+    is_hidden: bool

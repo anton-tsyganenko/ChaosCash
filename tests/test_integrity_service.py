@@ -44,7 +44,7 @@ def test_no_imbalance_initially(integrity):
 
 def test_detects_imbalance(repos, integrity):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, False)
     trans_id = repos["trans"].insert("2024-01-01 00:00:00", "Test")
     repos["split"].insert(trans_id, acc_id, cur_id, None, None, 5000)  # unbalanced!
     assert integrity.has_imbalance()
@@ -52,8 +52,8 @@ def test_detects_imbalance(repos, integrity):
 
 def test_balanced_no_imbalance(repos, integrity):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc1 = repos["account"].insert(None, "Cash", None, None, None, "ACT")
-    acc2 = repos["account"].insert(None, "Income", None, None, None, "ACT")
+    acc1 = repos["account"].insert(None, "Cash", None, None, None, False)
+    acc2 = repos["account"].insert(None, "Income", None, None, None, False)
     trans_id = repos["trans"].insert("2024-01-01 00:00:00", "Test")
     repos["split"].insert(trans_id, acc1, cur_id, None, None, 5000)
     repos["split"].insert(trans_id, acc2, cur_id, None, None, -5000)
@@ -71,7 +71,7 @@ def test_no_empty_transactions_initially(integrity):
 
 def test_zero_split_detection(repos, integrity):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, False)
     trans_id = repos["trans"].insert("2024-01-01 00:00:00", "Test")
     split_id = repos["split"].insert(trans_id, acc_id, cur_id, None, None, 0)
     zero_ids = integrity.get_zero_split_ids()

@@ -2,7 +2,7 @@
 from PyQt6.QtWidgets import (
     QTreeView, QMenu, QMessageBox, QAbstractItemView
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex
+from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex, QItemSelectionModel
 from PyQt6.QtGui import QAction
 from app.i18n import tr
 from app.ui.item_models.account_tree_model import (
@@ -100,22 +100,46 @@ class AccountTreeView(QTreeView):
         if acc is None:
             return
 
-        modifiers = self.window().QApplication.keyboardModifiers() if hasattr(self.window(), 'QApplication') else Qt.KeyboardModifier.NoModifier
         from PyQt6.QtWidgets import QApplication
         modifiers = QApplication.keyboardModifiers()
 
-        if modifiers & Qt.KeyboardModifier.ControlModifier:
-            # Multi-select: add to current selection, emit all selected
+        if modifiers & Qt.KeyboardModifier.AltModifier:
+            selected_ids = set()
+            for selected_index in self.selectedIndexes():
+                if selected_index.column() != 0:
+                    continue
+                selected_node = model.get_node(selected_index)
+                if selected_node and selected_node.account and not selected_node.is_virtual:
+                    selected_ids.add(selected_node.account.id)
+            selected_ids.add(acc.id)
+            selected_ids.update(self.account_repo.get_all_descendants(acc.id))
+
+            additive = bool(modifiers & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier))
+            self._select_account_ids(selected_ids, additive=additive)
+            self.account_selected.emit(list(selected_ids))
+            return
+
+        if modifiers & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
             self._on_selection_changed()
             return
 
-        # GRP click -> select all descendants
-        if acc.status == "GRP":
-            ids = [acc.id] + model.get_all_descendants(acc.id, self.settings.show_hidden_accounts)
-            self.account_selected.emit(ids)
+        self.account_selected.emit([acc.id])
+
+    def _select_account_ids(self, account_ids: set[int], additive: bool) -> None:
+        model: AccountTreeModel = self.model()
+        sel_model = self.selectionModel()
+        if model is None or sel_model is None:
             return
 
-        self.account_selected.emit([acc.id])
+        if not additive:
+            sel_model.clearSelection()
+
+        flags = QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
+        for account_id in account_ids:
+            idx = model.get_index_for_account(account_id)
+            if idx.isValid():
+                sel_model.select(idx, flags)
+                self.scrollTo(idx)
 
     def _on_selection_changed(self):
         model: AccountTreeModel = self.model()
@@ -163,7 +187,7 @@ class AccountTreeView(QTreeView):
             if node and node.account:
                 parent_id = node.account.id
 
-        new_id = self.account_repo.insert(parent_id, tr("New Account"), None, None, None, "ACT")
+        new_id = self.account_repo.insert(parent_id, tr("New Account"), None, None, None, False)
         self.balance_service.clear()
         model.reload()
         self.expandAll()
@@ -181,13 +205,13 @@ class AccountTreeView(QTreeView):
             return
         acc = node.account
 
-        dlg = DeleteAccountDialog(acc.name, self.account_repo, self.split_repo, acc.id, self)
+        dlg = DeleteAccountDialog(acc.name, self.account_repo, self.split_repo, self.settings, acc.id, self)
         if dlg.exec() != DeleteAccountDialog.DialogCode.Accepted:
             return
 
         action = dlg.action
         if action == DeleteAccountDialog.HIDE:
-            self.account_repo.update_status(acc.id, "HID")
+            self.account_repo.update_hidden(acc.id, True)
         elif action == DeleteAccountDialog.DELETE:
             # Handle sub-accounts
             if dlg.subaccounts_action == DeleteAccountDialog.MOVE_SUBACCOUNTS:

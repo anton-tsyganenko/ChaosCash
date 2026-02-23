@@ -46,7 +46,7 @@ def test_create_transaction(service, repos):
 
 def test_delete_transaction_cascades(service, repos):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, False)
     trans_id = service.create_transaction("Test")
     service.add_split(trans_id, acc_id, cur_id, amount=1000)
     service.delete_transaction(trans_id)
@@ -57,8 +57,8 @@ def test_delete_transaction_cascades(service, repos):
 
 def test_duplicate_transaction(service, repos):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
-    acc2_id = repos["account"].insert(None, "Bank", None, None, None, "ACT")
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, False)
+    acc2_id = repos["account"].insert(None, "Bank", None, None, None, False)
     trans_id = service.create_transaction("Original")
     service.add_split(trans_id, acc_id, cur_id, amount=1000)
     service.add_split(trans_id, acc2_id, cur_id, amount=-1000)
@@ -74,8 +74,8 @@ def test_duplicate_transaction(service, repos):
 
 def test_reverse_transaction(service, repos):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
-    acc2_id = repos["account"].insert(None, "Bank", None, None, None, "ACT")
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, False)
+    acc2_id = repos["account"].insert(None, "Bank", None, None, None, False)
     trans_id = service.create_transaction("Payment")
     service.add_split(trans_id, acc_id, cur_id, amount=5000)
     service.add_split(trans_id, acc2_id, cur_id, amount=-5000)
@@ -91,7 +91,7 @@ def test_reverse_transaction(service, repos):
 
 def test_update_split_fixed(service, repos):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc_id = repos["account"].insert(None, "Cash", None, None, None, "ACT")
+    acc_id = repos["account"].insert(None, "Cash", None, None, None, False)
     trans_id = service.create_transaction("Test")
     split_id = service.add_split(trans_id, acc_id, cur_id, amount=1000, amount_fixed=False)
 
@@ -109,9 +109,9 @@ def test_update_split_fixed(service, repos):
 
 def test_recalculate_flexible_splits(service, repos):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc1 = repos["account"].insert(None, "A", None, None, None, "ACT")
-    acc2 = repos["account"].insert(None, "B", None, None, None, "ACT")
-    acc3 = repos["account"].insert(None, "C", None, None, None, "ACT")
+    acc1 = repos["account"].insert(None, "A", None, None, None, False)
+    acc2 = repos["account"].insert(None, "B", None, None, None, False)
+    acc3 = repos["account"].insert(None, "C", None, None, None, False)
 
     trans_id = service.create_transaction("Test")
     s1 = service.add_split(trans_id, acc1, cur_id, amount=10000, amount_fixed=True)
@@ -131,8 +131,8 @@ def test_recalculate_flexible_splits(service, repos):
 
 def test_recalculate_flexible_splits_rebalances_existing_imbalance(service, repos):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc1 = repos["account"].insert(None, "A", None, None, None, "ACT")
-    acc2 = repos["account"].insert(None, "B", None, None, None, "ACT")
+    acc1 = repos["account"].insert(None, "A", None, None, None, False)
+    acc2 = repos["account"].insert(None, "B", None, None, None, False)
 
     trans_id = service.create_transaction("Test")
     s1 = service.add_split(trans_id, acc1, cur_id, amount=1000, amount_fixed=True)
@@ -149,8 +149,8 @@ def test_recalculate_flexible_splits_rebalances_existing_imbalance(service, repo
 
 def test_recalculate_flexible_splits_returns_false_without_flexible_split(service, repos):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc1 = repos["account"].insert(None, "A", None, None, None, "ACT")
-    acc2 = repos["account"].insert(None, "B", None, None, None, "ACT")
+    acc1 = repos["account"].insert(None, "A", None, None, None, False)
+    acc2 = repos["account"].insert(None, "B", None, None, None, False)
 
     trans_id = service.create_transaction("Test")
     service.add_split(trans_id, acc1, cur_id, amount=1000, amount_fixed=True)
@@ -162,9 +162,9 @@ def test_recalculate_flexible_splits_returns_false_without_flexible_split(servic
 
 def test_delete_split_and_rebalance(service, repos):
     cur_id = repos["currency"].insert("USD", "CURR", None, 100)
-    acc1 = repos["account"].insert(None, "A", None, None, None, "ACT")
-    acc2 = repos["account"].insert(None, "B", None, None, None, "ACT")
-    acc3 = repos["account"].insert(None, "C", None, None, None, "ACT")
+    acc1 = repos["account"].insert(None, "A", None, None, None, False)
+    acc2 = repos["account"].insert(None, "B", None, None, None, False)
+    acc3 = repos["account"].insert(None, "C", None, None, None, False)
 
     trans_id = service.create_transaction("Test")
     s1 = service.add_split(trans_id, acc1, cur_id, amount=1000, amount_fixed=True)

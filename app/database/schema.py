@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS Account (
     Code        TEXT,
     Description TEXT,
     ExternalID  TEXT,
-    Status      TEXT NOT NULL DEFAULT 'ACT'
+    IsHidden    INTEGER NOT NULL DEFAULT 0 CHECK (IsHidden IN (0, 1))
 );
 
 CREATE TABLE IF NOT EXISTS Trans (
