@@ -248,11 +248,16 @@ class AccountTreeModel(QAbstractItemModel):
         if col == COL_HIDDEN and role == Qt.ItemDataRole.CheckStateRole:
             raw_value = getattr(value, "value", value)
             is_hidden = int(raw_value) == int(Qt.CheckState.Checked.value)
+            if bool(acc.is_hidden) == is_hidden:
+                return False
             self.account_repo.update_hidden(acc.id, is_hidden)
             updated = self.account_repo.get_by_id(acc.id)
             if updated:
                 node.account = updated
                 self._id_to_node[acc.id] = node
+            if not self.settings.show_hidden_accounts and is_hidden:
+                self._remove_node_subtree(node)
+                return True
             self.dataChanged.emit(index, index, [role])
             return True
 
@@ -285,6 +290,33 @@ class AccountTreeModel(QAbstractItemModel):
             self._id_to_node[acc.id] = node
         self.dataChanged.emit(index, index, [role])
         return True
+
+    def _node_parent_index(self, node: AccountNode) -> QModelIndex:
+        parent_node = node.parent_node
+        if parent_node is None or parent_node is self._root:
+            return QModelIndex()
+        grand = parent_node.parent_node
+        if grand is None:
+            return QModelIndex()
+        row = grand.children.index(parent_node)
+        return self.createIndex(row, 0, parent_node)
+
+    def _remove_node_subtree(self, node: AccountNode) -> None:
+        parent_node = node.parent_node
+        if parent_node is None:
+            return
+        row = parent_node.children.index(node)
+        parent_index = self._node_parent_index(node)
+        self.beginRemoveRows(parent_index, row, row)
+        parent_node.children.pop(row)
+        self._remove_node_ids_recursive(node)
+        self.endRemoveRows()
+
+    def _remove_node_ids_recursive(self, node: AccountNode) -> None:
+        if node.account and not node.is_virtual:
+            self._id_to_node.pop(node.account.id, None)
+        for child in node.children:
+            self._remove_node_ids_recursive(child)
 
     def supportedDropActions(self):
         return Qt.DropAction.MoveAction
