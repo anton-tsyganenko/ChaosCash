@@ -6,6 +6,7 @@ from app.models.account import Account
 from app.repositories.account_repo import AccountRepo
 from app.services.balance_service import BalanceService
 from app.repositories.currency_repo import CurrencyRepo
+from app.utils.account_hierarchy import compute_hidden_account_ids
 from app.i18n import tr
 
 COL_NAME = 0
@@ -68,7 +69,7 @@ class AccountTreeModel(QAbstractItemModel):
         nodes: dict[int, AccountNode] = {acc.id: AccountNode(acc, None) for acc in all_accounts}
 
         if not self.settings.show_hidden_accounts:
-            hidden_ids = self._compute_hidden_subtree_ids(all_accounts)
+            hidden_ids = compute_hidden_account_ids(all_accounts)
             nodes = {aid: n for aid, n in nodes.items() if aid not in hidden_ids}
 
         for node in nodes.values():
@@ -89,26 +90,6 @@ class AccountTreeModel(QAbstractItemModel):
                 sort_recursive(child)
 
         sort_recursive(self._root)
-
-    def _compute_hidden_subtree_ids(self, all_accounts: list[Account]) -> set[int]:
-        children: dict[int, list[int]] = {}
-        for acc in all_accounts:
-            if acc.parent is not None:
-                children.setdefault(acc.parent, []).append(acc.id)
-
-        hidden: set[int] = {acc.id for acc in all_accounts if acc.is_hidden}
-
-        def mark_hidden_descendants(account_id: int) -> None:
-            for child_id in children.get(account_id, []):
-                if child_id in hidden:
-                    mark_hidden_descendants(child_id)
-                    continue
-                hidden.add(child_id)
-                mark_hidden_descendants(child_id)
-
-        for hidden_id in list(hidden):
-            mark_hidden_descendants(hidden_id)
-        return hidden
 
     def _add_virtual_nodes(self) -> None:
         if self._show_imbalance:

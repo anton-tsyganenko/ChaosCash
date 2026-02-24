@@ -46,9 +46,6 @@ class TransactionRepo:
     def get_summary_by_accounts(self, account_ids: list[int]) -> list[dict]:
         return self._fetch_dicts_with_ids(Q.GET_SUMMARY_BY_ACCOUNTS, account_ids)
 
-    def get_verbose_by_ids(self, trans_ids: list[int]) -> list[dict]:
-        return self._fetch_dicts_with_ids(Q.GET_VERBOSE_BY_IDS, trans_ids)
-
     def get_summary_by_ids(self, trans_ids: list[int]) -> list[dict]:
         return self._fetch_dicts_with_ids(Q.GET_SUMMARY_BY_IDS, trans_ids)
 
@@ -59,11 +56,3 @@ class TransactionRepo:
     def get_empty(self) -> list[Transaction]:
         rows = self.conn.execute(Q.GET_EMPTY).fetchall()
         return [_row_to_trans(r) for r in rows]
-
-    def get_autocomplete(self, account_id: int, prefix: str) -> list[Transaction]:
-        rows = self.conn.execute(Q.GET_AUTOCOMPLETE, (account_id, prefix + "%")).fetchall()
-        return [_row_to_trans(r) for r in rows]
-
-    def get_splits_for_trans(self, trans_id: int) -> list[dict]:
-        rows = self.conn.execute(Q.GET_SPLITS_FOR_TRANS, (trans_id,)).fetchall()
-        return [dict(r) for r in rows]

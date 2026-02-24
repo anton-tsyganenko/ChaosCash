@@ -5,6 +5,7 @@ from PyQt6.QtGui import QColor
 from app.repositories.transaction_repo import TransactionRepo
 from app.repositories.currency_repo import CurrencyRepo
 from app.utils.amount_math import format_amount
+from app.utils.date_utils import qt_format_to_strftime
 from app.i18n import tr
 from datetime import datetime, timezone, tzinfo as TZInfo
 
@@ -128,9 +129,7 @@ class TransactionModel(QAbstractTableModel):
     def _phantom_date(self) -> str:
         """Current local time formatted per settings."""
         try:
-            fmt = self.settings.date_format
-            fmt = fmt.replace("yyyy", "%Y").replace("MM", "%m").replace("dd", "%d")
-            fmt = fmt.replace("HH", "%H").replace("mm", "%M").replace("ss", "%S")
+            fmt = qt_format_to_strftime(self.settings.date_format)
             tz = self._local_tz or UTC
             return datetime.now(tz).strftime(fmt)
         except Exception:
@@ -142,8 +141,7 @@ class TransactionModel(QAbstractTableModel):
         try:
             dt = datetime.strptime(utc_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
             dt_local = dt.astimezone(self._local_tz)
-            fmt = self.settings.date_format.replace("yyyy", "%Y").replace("MM", "%m").replace("dd", "%d")
-            fmt = fmt.replace("HH", "%H").replace("mm", "%M").replace("ss", "%S")
+            fmt = qt_format_to_strftime(self.settings.date_format)
             return dt_local.strftime(fmt)
         except Exception:
             return utc_str
