@@ -1,8 +1,8 @@
 """Amount formatting service for UI models."""
 import math
 
-from app.repositories import CurrencyRepo
-from app.settings import AppSettings
+from app.repositories.currency_repo import CurrencyRepo
+from app.settings.app_settings import AppSettings
 
 
 class AmountFormatter:
