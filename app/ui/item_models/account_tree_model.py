@@ -6,6 +6,7 @@ from app.models.account import Account
 from app.repositories.account_repo import AccountRepo
 from app.services.balance_service import BalanceService
 from app.repositories.currency_repo import CurrencyRepo
+from app.services.amount_formatter import AmountFormatter
 from app.utils.account_hierarchy import compute_hidden_account_ids
 from app.i18n import tr
 
@@ -41,12 +42,13 @@ class AccountTreeModel(QAbstractItemModel):
     """Hierarchical model of accounts with optional virtual nodes."""
 
     def __init__(self, account_repo: AccountRepo, balance_service: BalanceService,
-                 currency_repo: CurrencyRepo, settings, parent=None):
+                 currency_repo: CurrencyRepo, settings, formatter: AmountFormatter, parent=None):
         super().__init__(parent)
         self.account_repo = account_repo
         self.balance_service = balance_service
         self.currency_repo = currency_repo
         self.settings = settings
+        self.formatter = formatter
 
         self._root = AccountNode(None, None)
         self._id_to_node: dict[int, AccountNode] = {}
@@ -188,11 +190,10 @@ class AccountTreeModel(QAbstractItemModel):
         for cid, quants in balance.items():
             if quants == 0:
                 continue
-            cur = self._currencies.get(cid)
-            if cur is None:
-                continue
-            from app.utils.amount_math import format_amount
-            parts.append(f"{format_amount(quants, cur.denominator, self.settings.decimal_sep, self.settings.thousands_sep)} {cur.code}")
+            try:
+                parts.append(self.formatter.format_with_currency(quants, cid))
+            except (ValueError, KeyError):
+                pass
         return ", ".join(parts)
 
     def headerData(self, section: int, orientation: Qt.Orientation,

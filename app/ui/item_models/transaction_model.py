@@ -1,10 +1,10 @@
 """QAbstractTableModel for the transaction list with running balance."""
 from __future__ import annotations
+import math
 from PyQt6.QtCore import Qt, QModelIndex, QAbstractTableModel, pyqtSignal, QTimer
 from PyQt6.QtGui import QColor
 from app.repositories.transaction_repo import TransactionRepo
 from app.repositories.currency_repo import CurrencyRepo
-from app.utils.amount_math import format_amount
 from app.utils.date_utils import qt_format_to_strftime
 from app.i18n import tr
 from datetime import datetime, timezone, tzinfo as TZInfo
@@ -149,11 +149,14 @@ class TransactionModel(QAbstractTableModel):
     def _format_amt(self, quants, denominator) -> str:
         if quants is None:
             return ""
-        return format_amount(
-            int(quants), int(denominator),
-            self.settings.decimal_sep,
-            self.settings.thousands_sep,
+        denom = int(denominator) if denominator else 1
+        decimal_places = math.ceil(math.log10(denom))
+        value = int(quants) / denom
+        formatted = f"{value:,.{decimal_places}f}".translate(
+            str.maketrans({",": self.settings.thousands_sep,
+                          ".": self.settings.decimal_sep})
         )
+        return formatted
 
     def data(self, index: QModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
         if not index.isValid() or index.row() >= self.rowCount():
