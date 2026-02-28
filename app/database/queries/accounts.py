@@ -18,14 +18,6 @@ UPDATE_HIDDEN = "UPDATE Account SET IsHidden=? WHERE ID=?"
 
 DELETE = "DELETE FROM Account WHERE ID=?"
 
-GET_BALANCE = """
-SELECT C.Code, C.ID AS CurrencyID, SUM(S.Amount) AS TotalQuants, C.Denominator
-FROM Split S
-JOIN Currency C ON S.Currency = C.ID
-WHERE S.Account = ?
-GROUP BY S.Currency
-"""
-
 MOVE_SPLITS_TO_ACCOUNT = "UPDATE Split SET Account=? WHERE Account=?"
 
 GET_TRANS_IDS_FOR_ACCOUNT = "SELECT DISTINCT Trans FROM Split WHERE Account=?"
