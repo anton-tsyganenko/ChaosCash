@@ -34,12 +34,6 @@ DELETE = "DELETE FROM Split WHERE ID=?"
 
 DELETE_BY_ACCOUNT = "DELETE FROM Split WHERE Account=?"
 
-GET_BALANCE_BY_ACCOUNT = """
-SELECT S.Currency, SUM(S.Amount) AS TotalQuants, C.Denominator
-FROM Split S JOIN Currency C ON S.Currency = C.ID
-WHERE S.Account=? GROUP BY S.Currency
-"""
-
 GET_LAST_CURRENCY_FOR_ACCOUNT = """
 SELECT S.Currency FROM Split S
 JOIN Trans T ON S.Trans = T.ID

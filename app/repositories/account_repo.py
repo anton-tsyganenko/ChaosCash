@@ -59,10 +59,10 @@ class AccountRepo:
         self.conn.execute(Q.DELETE, (account_id,))
         self.conn.commit()
 
-    def get_balance(self, account_id: int) -> dict[int, tuple[int, int]]:
-        """Returns {currency_id: (total_quants, denominator)}"""
+    def get_balance(self, account_id: int) -> dict[int, int]:
+        """Returns {currency_id: total_quants}"""
         rows = self.conn.execute(Q.GET_BALANCE, (account_id,)).fetchall()
-        return {r["CurrencyID"]: (r["TotalQuants"], r["Denominator"]) for r in rows}
+        return {r["Currency"]: r["TotalQuants"] for r in rows}
 
     def move_splits_to_account(self, from_account_id: int, to_account_id: int) -> None:
         self.conn.execute(Q.MOVE_SPLITS_TO_ACCOUNT, (to_account_id, from_account_id))

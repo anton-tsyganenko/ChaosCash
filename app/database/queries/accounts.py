@@ -19,9 +19,8 @@ UPDATE_HIDDEN = "UPDATE Account SET IsHidden=? WHERE ID=?"
 DELETE = "DELETE FROM Account WHERE ID=?"
 
 GET_BALANCE = """
-SELECT C.Code, C.ID AS CurrencyID, SUM(S.Amount) AS TotalQuants, C.Denominator
+SELECT S.Currency, SUM(S.Amount) AS TotalQuants
 FROM Split S
-JOIN Currency C ON S.Currency = C.ID
 WHERE S.Account = ?
 GROUP BY S.Currency
 """
