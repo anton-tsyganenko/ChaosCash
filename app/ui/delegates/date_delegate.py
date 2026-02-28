@@ -19,10 +19,7 @@ class DateDelegate(QStyledItemDelegate):
         return self.settings.date_format  # e.g. "yyyy-MM-dd HH:mm:ss"
 
     def _local_tz(self):
-        try:
-            return datetime.now().astimezone().tzinfo
-        except Exception:
-            return UTC
+        return datetime.now().astimezone().tzinfo
 
     def createEditor(self, parent, option, index):
         editor = QDateTimeEdit(parent)

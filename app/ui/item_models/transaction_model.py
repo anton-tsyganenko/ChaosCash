@@ -43,17 +43,12 @@ class TransactionModel(QAbstractTableModel):
         self._all_rows: list[dict] = []
         self._account_ids: list[int] = []
         self._currencies: dict[int, object] = {}
-        self._local_tz: TZInfo | None = None
+        self._local_tz: TZInfo = datetime.now().astimezone().tzinfo
 
     def load(self, account_ids: list[int]) -> None:
         self.beginResetModel()
         self._account_ids = account_ids
         self._currencies = {c.id: c for c in self.currency_repo.get_all()}
-        try:
-            import datetime as dt
-            self._local_tz = dt.datetime.now().astimezone().tzinfo
-        except Exception:
-            self._local_tz = UTC
 
         if not account_ids:
             self._all_rows = []
@@ -76,11 +71,6 @@ class TransactionModel(QAbstractTableModel):
         self.beginResetModel()
         self._account_ids = []  # no phantom row for virtual node views
         self._currencies = {c.id: c for c in self.currency_repo.get_all()}
-        try:
-            import datetime as dt
-            self._local_tz = dt.datetime.now().astimezone().tzinfo
-        except Exception:
-            self._local_tz = UTC
 
         if not trans_ids:
             self._all_rows = []
@@ -130,8 +120,7 @@ class TransactionModel(QAbstractTableModel):
         """Current local time formatted per settings."""
         try:
             fmt = qt_format_to_strftime(self.settings.date_format)
-            tz = self._local_tz or UTC
-            return datetime.now(tz).strftime(fmt)
+            return datetime.now(self._local_tz).strftime(fmt)
         except Exception:
             return datetime.now().strftime("%Y-%m-%d")
 

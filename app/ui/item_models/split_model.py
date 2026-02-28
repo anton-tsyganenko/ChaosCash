@@ -166,14 +166,6 @@ class SplitModel(QAbstractTableModel):
         cur = self._currencies.get(currency_id)
         return cur.code if cur else str(currency_id)
 
-    def _format_amt(self, quants: int, currency_id: int | None) -> str:
-        if currency_id is None:
-            return ""
-        try:
-            return self.formatter.format_amount(quants, currency_id)
-        except (ValueError, KeyError):
-            return str(quants)
-
     def _edit_amt(self, quants: int, currency_id: int | None) -> str:
         """Return raw editable amount in units (no thousands separators)."""
         if currency_id is None:
@@ -194,7 +186,7 @@ class SplitModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.DisplayRole:
             if row_obj.row_type == ROW_PHANTOM:
                 if col == COL_AMOUNT:
-                    return self._format_amt(row_obj.phantom_amount, row_obj.phantom_currency_id)
+                    return self.formatter.format_amount(row_obj.phantom_amount, row_obj.phantom_currency_id)
                 if col == COL_CURRENCY:
                     return self._currency_code(row_obj.phantom_currency_id)
                 if col == COL_ACCOUNT:
@@ -226,7 +218,7 @@ class SplitModel(QAbstractTableModel):
             if col == COL_ACCOUNT:
                 return self.account_repo.get_account_path(s.account)
             if col == COL_AMOUNT:
-                return self._format_amt(s.amount, s.currency)
+                return self.formatter.format_amount(s.amount, s.currency)
             if col == COL_CURRENCY:
                 return self._currency_code(s.currency)
             return None
@@ -349,30 +341,21 @@ class SplitModel(QAbstractTableModel):
                     changed_roles = [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole]
 
             elif col == COL_ACCOUNT and role == Qt.ItemDataRole.UserRole:
-                try:
-                    new_account = int(value) if value is not None else None
-                except (TypeError, ValueError):
-                    return False
+                new_account = int(value) if value is not None else None
                 if new_account is not None and new_account != split.account:
                     row_obj.split = replace(split, account=new_account)
                     changed = True
                     changed_roles = [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.UserRole]
 
             elif col == COL_CURRENCY and role == Qt.ItemDataRole.UserRole:
-                try:
-                    new_currency = int(value) if value is not None else None
-                except (TypeError, ValueError):
-                    return False
+                new_currency = int(value) if value is not None else None
                 if new_currency is not None and new_currency != split.currency:
                     row_obj.split = replace(split, currency=new_currency)
                     changed = True
                     changed_roles = [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.UserRole]
 
             elif col == COL_AMOUNT and role in (Qt.ItemDataRole.EditRole, Qt.ItemDataRole.DisplayRole):
-                try:
-                    value_float = float(str(value).strip())
-                except (TypeError, ValueError):
-                    return False
+                value_float = float(str(value).strip())
                 currency_id = split.currency
                 cur = self._currencies.get(currency_id)
                 denom = cur.denominator if cur else 100
@@ -384,20 +367,14 @@ class SplitModel(QAbstractTableModel):
 
         elif row_obj.row_type in (ROW_PHANTOM, ROW_NEW):
             if col == COL_ACCOUNT and role == Qt.ItemDataRole.UserRole:
-                try:
-                    new_account = int(value) if value is not None else None
-                except (TypeError, ValueError):
-                    return False
+                new_account = int(value) if value is not None else None
                 if new_account != row_obj.account_id:
                     row_obj.account_id = new_account
                     changed = True
                     changed_roles = [Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.UserRole]
 
             elif row_obj.row_type == ROW_NEW and col == COL_CURRENCY and role == Qt.ItemDataRole.UserRole:
-                try:
-                    new_currency = int(value) if value is not None else None
-                except (TypeError, ValueError):
-                    return False
+                new_currency = int(value) if value is not None else None
                 if new_currency != row_obj.currency_id:
                     row_obj.currency_id = new_currency
                     changed = True
