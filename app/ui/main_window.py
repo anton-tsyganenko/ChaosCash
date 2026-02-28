@@ -509,6 +509,7 @@ class MainWindow(QMainWindow):
     def _on_virtual_node_selected(self, virtual_id: int):
         self._new_trans_entry_mode = False
         self._post_reload_focus = None
+        self._selected_account_ids = []
         self._virtual_mode = virtual_id
         self._load_virtual_transactions(virtual_id)
 
@@ -805,7 +806,10 @@ class MainWindow(QMainWindow):
         self.settings.transaction_view_mode = mode
         self.act_detailed.setChecked(mode == "detailed")
         self.act_aggregated.setChecked(mode == "aggregated")
-        self._load_transactions()
+        if self._virtual_mode is not None:
+            self._load_virtual_transactions(self._virtual_mode)
+        else:
+            self._load_transactions()
 
     def _refresh_integrity(self):
         has_imbalance = self.integrity_service.has_imbalance()
