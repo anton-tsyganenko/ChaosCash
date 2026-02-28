@@ -353,9 +353,6 @@ class AccountTreeModel(QAbstractItemModel):
         sort_recursive(self._root)
         self.layoutChanged.emit()
 
-    def get_node_by_account_id(self, account_id: int) -> AccountNode | None:
-        return self._id_to_node.get(account_id)
-
     def get_index_for_account(self, account_id: int) -> QModelIndex:
         node = self._id_to_node.get(account_id)
         if node is None or node.parent_node is None:
