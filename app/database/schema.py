@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS Currency (
     Code        TEXT NOT NULL UNIQUE,
     Type        TEXT NOT NULL,
     Name        TEXT,
-    Denominator INTEGER NOT NULL DEFAULT 100
+    Denominator INTEGER NOT NULL DEFAULT 100 CHECK (Denominator >= 1)
 );
 
 CREATE TABLE IF NOT EXISTS Account (

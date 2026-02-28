@@ -40,11 +40,6 @@ from app.utils.expression_parser import safe_eval
 from app.ui.item_models.account_tree_model import (
     AccountTreeModel, VIRTUAL_IMBALANCE_ID, VIRTUAL_EMPTY_ID
 )
-from datetime import datetime, timezone
-
-UTC = timezone.utc
-
-
 class MainWindow(QMainWindow):
     """One main window per open database file."""
 
@@ -261,14 +256,9 @@ class MainWindow(QMainWindow):
         self.transaction_view.setModel(self.trans_model)
         th = self.transaction_view.horizontalHeader()
         th.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        try:
-            fmt = self.settings.date_format
-            fmt = fmt.replace("yyyy", "%Y").replace("MM", "%m").replace("dd", "%d")
-            fmt = fmt.replace("HH", "%H").replace("mm", "%M").replace("ss", "%S")
-            sample = datetime.now().strftime(fmt)
-            date_width = self.transaction_view.fontMetrics().horizontalAdvance(sample) + 20
-        except Exception:
-            date_width = 150
+        date_width = self.transaction_view.fontMetrics().horizontalAdvance(
+            self.settings.date_format
+        ) + 20
         th.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         th.resizeSection(1, date_width)
 
