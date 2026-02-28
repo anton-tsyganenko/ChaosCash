@@ -82,5 +82,5 @@ class SplitRepo:
 
     def has_splits_for_account(self, account_id: int) -> bool:
         """Check if an account has any splits."""
-        row = self.conn.execute("SELECT 1 FROM Split WHERE Account=? LIMIT 1", (account_id,)).fetchone()
+        row = self.conn.execute(Q.HAS_SPLITS_FOR_ACCOUNT, (account_id,)).fetchone()
         return row is not None

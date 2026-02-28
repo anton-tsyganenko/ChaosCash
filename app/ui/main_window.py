@@ -20,6 +20,7 @@ from app.repositories.currency_repo import CurrencyRepo
 from app.services.balance_service import BalanceService
 from app.services.transaction_service import TransactionService
 from app.services.integrity_service import IntegrityService
+from app.services.amount_formatter import AmountFormatter
 from app.ui.item_models.transaction_model import TransactionModel
 from app.ui.item_models.split_model import (
     SplitModel, ROW_PHANTOM, ROW_NEW, COL_EXTID, COL_DESC, COL_ACCOUNT, COL_FIXED, COL_AMOUNT, COL_CURRENCY
@@ -64,6 +65,7 @@ class MainWindow(QMainWindow):
         self.balance_service = BalanceService(self.account_repo, self.split_repo)
         self.trans_service = TransactionService(self.trans_repo, self.split_repo)
         self.integrity_service = IntegrityService(self.trans_repo, self.split_repo, self._conn)
+        self.amount_formatter = AmountFormatter(self.settings, self.currency_repo)
 
         # State
         self._selected_account_ids: list[int] = []
@@ -236,7 +238,7 @@ class MainWindow(QMainWindow):
         # Account tree model
         self.account_model = AccountTreeModel(
             self.account_repo, self.balance_service,
-            self.currency_repo, self.settings
+            self.currency_repo, self.settings, self.amount_formatter
         )
         self.account_tree.setModel(self.account_model)
         self.account_tree.expandAll()
@@ -272,7 +274,7 @@ class MainWindow(QMainWindow):
 
         # Split model
         self.split_model = SplitModel(
-            self.split_repo, self.account_repo, self.currency_repo, self.settings
+            self.split_repo, self.account_repo, self.currency_repo, self.settings, self.amount_formatter
         )
         self.split_view.setModel(self.split_model)
         sh = self.split_view.horizontalHeader()

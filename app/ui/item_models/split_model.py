@@ -13,7 +13,8 @@ from app.repositories.split_repo import SplitRepo
 from app.repositories.account_repo import AccountRepo
 from app.repositories.currency_repo import CurrencyRepo
 from app.models.split import Split
-from app.utils.amount_math import format_amount, float_to_quants
+from app.utils.amount_math import float_to_quants
+from app.services.amount_formatter import AmountFormatter
 from app.i18n import tr
 
 COL_ID = 0
@@ -67,6 +68,7 @@ class SplitModel(QAbstractTableModel):
         account_repo: AccountRepo,
         currency_repo: CurrencyRepo,
         settings,
+        formatter: AmountFormatter,
         parent=None,
     ):
         super().__init__(parent)
@@ -74,6 +76,7 @@ class SplitModel(QAbstractTableModel):
         self.account_repo = account_repo
         self.currency_repo = currency_repo
         self.settings = settings
+        self.formatter = formatter
         self._logger = logging.getLogger("chaoscash.ui.model.split")
 
         self._rows: list[SplitRow] = []
@@ -166,15 +169,10 @@ class SplitModel(QAbstractTableModel):
     def _format_amt(self, quants: int, currency_id: int | None) -> str:
         if currency_id is None:
             return ""
-        cur = self._currencies.get(currency_id)
-        if cur is None:
+        try:
+            return self.formatter.format_amount(quants, currency_id)
+        except (ValueError, KeyError):
             return str(quants)
-        return format_amount(
-            quants,
-            cur.denominator,
-            self.settings.decimal_sep,
-            self.settings.thousands_sep,
-        )
 
     def _edit_amt(self, quants: int, currency_id: int | None) -> str:
         """Return raw editable amount in units (no thousands separators)."""

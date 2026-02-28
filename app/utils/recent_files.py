@@ -25,14 +25,6 @@ def add_recent_file(path: str) -> None:
     settings.setValue(_KEY, files)
 
 
-def remove_recent_file(path: str) -> None:
-    files = get_recent_files()
-    if path in files:
-        files.remove(path)
-    settings = QSettings(_ORG, _APP)
-    settings.setValue(_KEY, files)
-
-
 def get_last_file() -> str | None:
     files = get_recent_files()
     return files[0] if files else None

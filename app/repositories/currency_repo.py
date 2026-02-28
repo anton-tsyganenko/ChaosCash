@@ -25,10 +25,6 @@ class CurrencyRepo:
         row = self.conn.execute(Q.GET_BY_ID, (currency_id,)).fetchone()
         return _row_to_currency(row) if row else None
 
-    def get_by_code(self, code: str) -> Currency | None:
-        row = self.conn.execute(Q.GET_BY_CODE, (code,)).fetchone()
-        return _row_to_currency(row) if row else None
-
     def insert(self, code: str, type_: str, name: str | None, denominator: int) -> int:
         cur = self.conn.execute(Q.INSERT, (code, type_, name, denominator))
         self.conn.commit()

@@ -32,10 +32,6 @@ class AccountRepo:
         rows = self.conn.execute(Q.GET_CHILDREN, (account_id,)).fetchall()
         return [_row_to_account(r) for r in rows]
 
-    def get_root_accounts(self) -> list[Account]:
-        rows = self.conn.execute(Q.GET_ROOT).fetchall()
-        return [_row_to_account(r) for r in rows]
-
     def get_parent_id(self, account_id: int) -> int | None:
         acc = self.get_by_id(account_id)
         return acc.parent if acc else None
