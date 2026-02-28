@@ -887,8 +887,5 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self._save_view_settings()
         self._save_window_layout()
-        try:
-            self._conn.close()
-        except Exception:
-            pass
+        self._conn.close()
         super().closeEvent(event)
