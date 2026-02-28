@@ -190,10 +190,7 @@ class AccountTreeModel(QAbstractItemModel):
         for cid, quants in balance.items():
             if quants == 0:
                 continue
-            try:
-                parts.append(self.formatter.format_with_currency(quants, cid))
-            except (ValueError, KeyError):
-                pass
+            parts.append(self.formatter.format_with_currency(quants, cid))
         return ", ".join(parts)
 
     def headerData(self, section: int, orientation: Qt.Orientation,

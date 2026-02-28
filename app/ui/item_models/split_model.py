@@ -166,14 +166,6 @@ class SplitModel(QAbstractTableModel):
         cur = self._currencies.get(currency_id)
         return cur.code if cur else str(currency_id)
 
-    def _format_amt(self, quants: int, currency_id: int | None) -> str:
-        if currency_id is None:
-            return ""
-        try:
-            return self.formatter.format_amount(quants, currency_id)
-        except (ValueError, KeyError):
-            return str(quants)
-
     def _edit_amt(self, quants: int, currency_id: int | None) -> str:
         """Return raw editable amount in units (no thousands separators)."""
         if currency_id is None:
@@ -194,7 +186,7 @@ class SplitModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.DisplayRole:
             if row_obj.row_type == ROW_PHANTOM:
                 if col == COL_AMOUNT:
-                    return self._format_amt(row_obj.phantom_amount, row_obj.phantom_currency_id)
+                    return self.formatter.format_amount(row_obj.phantom_amount, row_obj.phantom_currency_id)
                 if col == COL_CURRENCY:
                     return self._currency_code(row_obj.phantom_currency_id)
                 if col == COL_ACCOUNT:
@@ -226,7 +218,7 @@ class SplitModel(QAbstractTableModel):
             if col == COL_ACCOUNT:
                 return self.account_repo.get_account_path(s.account)
             if col == COL_AMOUNT:
-                return self._format_amt(s.amount, s.currency)
+                return self.formatter.format_amount(s.amount, s.currency)
             if col == COL_CURRENCY:
                 return self._currency_code(s.currency)
             return None
