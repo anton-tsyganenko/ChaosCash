@@ -67,11 +67,6 @@ class SplitRepo:
         self.conn.execute(Q.DELETE_BY_ACCOUNT, (account_id,))
         self.conn.commit()
 
-    def get_balance_by_account(self, account_id: int) -> dict[int, tuple[int, int]]:
-        """Returns {currency_id: (total_quants, denominator)}"""
-        rows = self.conn.execute(Q.GET_BALANCE_BY_ACCOUNT, (account_id,)).fetchall()
-        return {r["Currency"]: (r["TotalQuants"], r["Denominator"]) for r in rows}
-
     def get_last_currency_for_account(self, account_id: int) -> int | None:
         row = self.conn.execute(Q.GET_LAST_CURRENCY_FOR_ACCOUNT, (account_id,)).fetchone()
         return row[0] if row else None
