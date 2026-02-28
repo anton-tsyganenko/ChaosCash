@@ -35,7 +35,7 @@ def repos(db):
 
 @pytest.fixture
 def balance_service(repos):
-    return BalanceService(repos["account"], repos["split"])
+    return BalanceService(repos["account"])
 
 
 def test_empty_account_balance(repos, balance_service):

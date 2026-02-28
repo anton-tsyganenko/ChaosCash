@@ -1,15 +1,13 @@
 """Balance calculation service."""
 from collections import defaultdict
 from app.repositories.account_repo import AccountRepo
-from app.repositories.split_repo import SplitRepo
 
 
 class BalanceService:
     """Calculates and caches account balances."""
 
-    def __init__(self, account_repo: AccountRepo, split_repo: SplitRepo):
+    def __init__(self, account_repo: AccountRepo):
         self.account_repo = account_repo
-        self.split_repo = split_repo
         # {account_id: {currency_id: quants}}  — leaf balances only
         self._leaf_cache: dict[int, dict[int, int]] = {}
 
@@ -43,8 +41,7 @@ class BalanceService:
     def _get_leaf_balance(self, account_id: int) -> dict[int, int]:
         if account_id in self._leaf_cache:
             return self._leaf_cache[account_id]
-        raw = self.account_repo.get_balance(account_id)
-        balance = {cid: quants for cid, (quants, _) in raw.items()}
+        balance = self.account_repo.get_balance(account_id)
         self._leaf_cache[account_id] = balance
         return balance
 

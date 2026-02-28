@@ -62,7 +62,7 @@ class MainWindow(QMainWindow):
         self.currency_repo = CurrencyRepo(self._conn)
 
         # Services
-        self.balance_service = BalanceService(self.account_repo, self.split_repo)
+        self.balance_service = BalanceService(self.account_repo)
         self.trans_service = TransactionService(self.trans_repo, self.split_repo)
         self.integrity_service = IntegrityService(self.trans_repo, self.split_repo, self._conn)
         self.amount_formatter = AmountFormatter(self.settings, self.currency_repo)
