@@ -504,6 +504,7 @@ class MainWindow(QMainWindow):
         self._post_reload_focus = None
         self._selected_account_ids = account_ids
         self._virtual_mode = None
+        # Don't clear _current_trans_id — let _load_transactions restore it if it exists
         self._load_transactions()
 
     def _on_virtual_node_selected(self, virtual_id: int):
@@ -511,12 +512,21 @@ class MainWindow(QMainWindow):
         self._post_reload_focus = None
         self._selected_account_ids = []
         self._virtual_mode = virtual_id
+        # Don't clear _current_trans_id — let _load_virtual_transactions restore it if it exists
         self._load_virtual_transactions(virtual_id)
 
     def _load_transactions(self):
         self.trans_model.load(self._selected_account_ids)
         self.split_model.load(None)
-        self._current_trans_id = None
+        # Re-select current transaction after model reload if it exists
+        if self._current_trans_id:
+            row = self.trans_model.find_row_for_trans(self._current_trans_id)
+            if row >= 0:
+                self.transaction_view.setCurrentIndex(
+                    self.trans_model.index(row, 0))
+            else:
+                # Transaction doesn't exist in new account set, clear selection
+                self._current_trans_id = None
 
     def _load_virtual_transactions(self, virtual_id: int):
         """Load transactions for virtual nodes (imbalance, empty)."""
@@ -529,7 +539,15 @@ class MainWindow(QMainWindow):
             trans_ids = []
         self.trans_model.load_by_ids(trans_ids)
         self.split_model.load(None)
-        self._current_trans_id = None
+        # Re-select current transaction after model reload if it exists
+        if self._current_trans_id:
+            row = self.trans_model.find_row_for_trans(self._current_trans_id)
+            if row >= 0:
+                self.transaction_view.setCurrentIndex(
+                    self.trans_model.index(row, 0))
+            else:
+                # Transaction doesn't exist in virtual node view, clear selection
+                self._current_trans_id = None
 
     def _on_transaction_cleared(self):
         self._new_trans_entry_mode = False
