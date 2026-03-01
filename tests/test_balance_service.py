@@ -1,15 +1,16 @@
 """Tests for the balance service."""
-import pytest
+import os
 import sqlite3
 import sys
-import os
+
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from app.database.connection import open_connection
 from app.database.schema import ensure_schema
 from app.repositories.account_repo import AccountRepo
-from app.repositories.split_repo import SplitRepo
 from app.repositories.currency_repo import CurrencyRepo
+from app.repositories.split_repo import SplitRepo
 from app.repositories.transaction_repo import TransactionRepo
 from app.services.balance_service import BalanceService
 

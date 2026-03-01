@@ -4,10 +4,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from PyQt6.QtCore import QObject, QEvent
+from PyQt6.QtCore import QEvent, QObject
 from PyQt6.QtGui import QKeyEvent, QMouseEvent
-from PyQt6.QtWidgets import QApplication, QAbstractItemView, QWidget
-
+from PyQt6.QtWidgets import QAbstractItemView, QApplication, QWidget
 
 EVENT_LOGGER_NAME = "chaoscash.ui.events"
 

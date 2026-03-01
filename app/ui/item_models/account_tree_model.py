@@ -1,14 +1,16 @@
 """QAbstractItemModel for the account hierarchy tree."""
 from __future__ import annotations
-from PyQt6.QtCore import Qt, QModelIndex, QAbstractItemModel
+
+from PyQt6.QtCore import QAbstractItemModel, QModelIndex, Qt
 from PyQt6.QtGui import QColor
+
+from app.i18n import tr
 from app.models.account import Account
 from app.repositories.account_repo import AccountRepo
-from app.services.balance_service import BalanceService
 from app.repositories.currency_repo import CurrencyRepo
 from app.services.amount_formatter import AmountFormatter
+from app.services.balance_service import BalanceService
 from app.utils.account_hierarchy import compute_hidden_account_ids
-from app.i18n import tr
 
 COL_NAME = 0
 COL_TOTAL_BALANCE = 1
@@ -313,7 +315,7 @@ class AccountTreeModel(QAbstractItemModel):
         return ["application/x-chaoscash-account"]
 
     def mimeData(self, indexes):
-        from PyQt6.QtCore import QMimeData, QByteArray
+        from PyQt6.QtCore import QByteArray, QMimeData
         ids = []
         for idx in indexes:
             if idx.column() == 0 and idx.isValid():

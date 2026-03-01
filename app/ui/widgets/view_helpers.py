@@ -1,8 +1,8 @@
 """Shared helpers for table/tree UI widgets."""
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QAbstractItemView, QMenu
 from PyQt6.QtGui import QAction
+from PyQt6.QtWidgets import QMenu
 
 
 def find_next_editable_table_cell(view):

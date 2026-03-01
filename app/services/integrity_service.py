@@ -1,8 +1,9 @@
 """Integrity checks: imbalanced transactions, empty transactions, zero-amount splits."""
 import sqlite3
-from app.repositories.transaction_repo import TransactionRepo
-from app.repositories.split_repo import SplitRepo
+
 from app.models.transaction import Transaction
+from app.repositories.split_repo import SplitRepo
+from app.repositories.transaction_repo import TransactionRepo
 
 
 class IntegrityService:

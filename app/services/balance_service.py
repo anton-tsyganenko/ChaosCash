@@ -1,5 +1,6 @@
 """Balance calculation service."""
 from collections import defaultdict
+
 from app.repositories.account_repo import AccountRepo
 
 

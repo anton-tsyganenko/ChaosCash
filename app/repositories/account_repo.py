@@ -1,6 +1,7 @@
 import sqlite3
-from app.models.account import Account
+
 from app.database.queries import accounts as Q
+from app.models.account import Account
 
 
 def _row_to_account(row) -> Account:

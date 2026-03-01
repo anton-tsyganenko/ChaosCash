@@ -1,11 +1,19 @@
 """Transaction table view with context menu."""
 import logging
-from PyQt6.QtWidgets import QTableView, QMenu, QAbstractItemView, QAbstractItemDelegate, QWidget
-from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex
+
+from PyQt6.QtCore import QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QAction
+from PyQt6.QtWidgets import (
+    QAbstractItemDelegate,
+    QAbstractItemView,
+    QMenu,
+    QTableView,
+    QWidget,
+)
+
 from app.i18n import tr
 from app.services.transaction_service import TransactionService
-from app.ui.item_models.transaction_model import TransactionModel, COL_DATE, COL_DESC
+from app.ui.item_models.transaction_model import COL_DATE, COL_DESC, TransactionModel
 from app.ui.widgets.view_helpers import (
     find_next_editable_table_cell,
     set_column_visibility,

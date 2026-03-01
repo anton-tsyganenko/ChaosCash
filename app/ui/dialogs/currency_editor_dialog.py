@@ -1,10 +1,18 @@
 """Currency editor dialog."""
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QTableWidget, QTableWidgetItem,
-    QPushButton, QMessageBox, QDialogButtonBox, QHeaderView, QSpinBox,
-    QLineEdit, QComboBox
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QHeaderView,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
 )
-from PyQt6.QtCore import Qt
+
 from app.i18n import tr
 from app.repositories.currency_repo import CurrencyRepo
 

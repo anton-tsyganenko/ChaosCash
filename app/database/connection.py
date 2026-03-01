@@ -1,5 +1,6 @@
 import sqlite3
 
+
 def open_connection(db_path: str) -> sqlite3.Connection:
     """Open an SQLite connection and apply required pragmas."""
     conn = sqlite3.connect(db_path)

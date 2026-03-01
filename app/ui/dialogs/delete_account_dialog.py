@@ -1,8 +1,15 @@
 """Dialog for deleting an account with multiple options."""
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout,
-    QRadioButton, QButtonGroup, QComboBox, QDialogButtonBox, QGroupBox
+    QButtonGroup,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QGroupBox,
+    QHBoxLayout,
+    QRadioButton,
+    QVBoxLayout,
 )
+
 from app.i18n import tr
 from app.repositories.account_repo import AccountRepo
 from app.repositories.split_repo import SplitRepo

@@ -1,8 +1,9 @@
 """Delegate for date/time fields with timezone handling."""
-from PyQt6.QtWidgets import QStyledItemDelegate, QDateTimeEdit
-from PyQt6.QtCore import Qt, QDateTime
-from datetime import datetime, timezone
 import logging
+from datetime import datetime, timezone
+
+from PyQt6.QtCore import QDateTime, Qt
+from PyQt6.QtWidgets import QDateTimeEdit, QStyledItemDelegate
 
 UTC = timezone.utc
 

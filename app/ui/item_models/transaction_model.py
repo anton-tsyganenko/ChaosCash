@@ -1,13 +1,17 @@
 """QAbstractTableModel for the transaction list with running balance."""
 from __future__ import annotations
+
 import math
-from PyQt6.QtCore import Qt, QModelIndex, QAbstractTableModel, pyqtSignal, QTimer
+from datetime import datetime, timezone
+from datetime import tzinfo as TZInfo
+
+from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor
-from app.repositories.transaction_repo import TransactionRepo
-from app.repositories.currency_repo import CurrencyRepo
-from app.utils.date_utils import qt_format_to_strftime
+
 from app.i18n import tr
-from datetime import datetime, timezone, tzinfo as TZInfo
+from app.repositories.currency_repo import CurrencyRepo
+from app.repositories.transaction_repo import TransactionRepo
+from app.utils.date_utils import qt_format_to_strftime
 
 UTC = timezone.utc
 FETCH_BLOCK = 500
@@ -296,4 +300,3 @@ class TransactionModel(QAbstractTableModel):
 
     def set_filter(self, filter_text: str = "") -> None:
         """Placeholder for future filtering support."""
-        pass

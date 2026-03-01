@@ -1,6 +1,7 @@
 import sqlite3
-from app.models.split import Split
+
 from app.database.queries import splits as Q
+from app.models.split import Split
 
 
 def _row_to_split(row) -> Split:

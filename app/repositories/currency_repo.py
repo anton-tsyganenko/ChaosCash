@@ -1,6 +1,7 @@
 import sqlite3
-from app.models.currency import Currency
+
 from app.database.queries import currencies as Q
+from app.models.currency import Currency
 
 
 def _row_to_currency(row) -> Currency:

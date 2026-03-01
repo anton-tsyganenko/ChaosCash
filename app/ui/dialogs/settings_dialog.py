@@ -1,8 +1,13 @@
 """Application settings dialog."""
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QFormLayout, QLineEdit,
-    QDialogButtonBox, QGroupBox
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QLineEdit,
+    QVBoxLayout,
 )
+
 from app.i18n import tr
 from app.settings.app_settings import AppSettings
 

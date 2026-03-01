@@ -1,6 +1,5 @@
 """Helpers for account selection drop-downs."""
 
-from app.models.account import Account
 from app.repositories.account_repo import AccountRepo
 from app.utils.account_hierarchy import compute_hidden_account_ids
 

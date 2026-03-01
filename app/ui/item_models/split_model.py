@@ -1,21 +1,21 @@
 """QAbstractTableModel for splits of the selected transaction."""
 from __future__ import annotations
 
-from collections import defaultdict
-from dataclasses import replace
 import logging
 import math
+from collections import defaultdict
+from dataclasses import replace
 
-from PyQt6.QtCore import Qt, QModelIndex, QAbstractTableModel
+from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PyQt6.QtGui import QColor
 
-from app.repositories.split_repo import SplitRepo
+from app.i18n import tr
+from app.models.split import Split
 from app.repositories.account_repo import AccountRepo
 from app.repositories.currency_repo import CurrencyRepo
-from app.models.split import Split
-from app.utils.amount_math import float_to_quants
+from app.repositories.split_repo import SplitRepo
 from app.services.amount_formatter import AmountFormatter
-from app.i18n import tr
+from app.utils.amount_math import float_to_quants
 
 COL_ID = 0
 COL_EXTID = 1
@@ -487,4 +487,3 @@ class SplitModel(QAbstractTableModel):
     def set_filter(self, filter_text: str = "") -> None:
         """Placeholder for future filtering support."""
         self._logger.debug("set_filter filter_text=%r", filter_text)
-        pass

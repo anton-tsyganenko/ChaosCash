@@ -1,6 +1,7 @@
 import sqlite3
-from app.models.transaction import Transaction
+
 from app.database.queries import transactions as Q
+from app.models.transaction import Transaction
 
 
 def _row_to_trans(row) -> Transaction:

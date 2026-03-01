@@ -1,8 +1,10 @@
 """Delegate for amount fields with arithmetic expression support."""
-from PyQt6.QtWidgets import QStyledItemDelegate, QLineEdit, QToolTip
-from PyQt6.QtCore import Qt, QEvent
-from app.utils.expression_parser import safe_eval
 import logging
+
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtWidgets import QLineEdit, QStyledItemDelegate, QToolTip
+
+from app.utils.expression_parser import safe_eval
 
 
 class AmountDelegate(QStyledItemDelegate):

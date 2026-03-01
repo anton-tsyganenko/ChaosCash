@@ -1,19 +1,19 @@
 """Account tree view with context menu and drag-and-drop."""
-from PyQt6.QtWidgets import (
-    QTreeView, QMenu, QMessageBox, QAbstractItemView
-)
-from PyQt6.QtCore import Qt, pyqtSignal, QModelIndex, QItemSelectionModel
+from PyQt6.QtCore import QItemSelectionModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QAction
+from PyQt6.QtWidgets import QAbstractItemView, QMenu, QTreeView
+
 from app.i18n import tr
-from app.ui.item_models.account_tree_model import (
-    AccountTreeModel, VIRTUAL_IMBALANCE_ID, VIRTUAL_EMPTY_ID
-)
 from app.repositories.account_repo import AccountRepo
-from app.repositories.transaction_repo import TransactionRepo
 from app.repositories.split_repo import SplitRepo
+from app.repositories.transaction_repo import TransactionRepo
 from app.services.balance_service import BalanceService
 from app.ui.dialogs.delete_account_dialog import DeleteAccountDialog
-from app.ui.widgets.view_helpers import set_column_visibility, show_column_visibility_menu
+from app.ui.item_models.account_tree_model import AccountTreeModel
+from app.ui.widgets.view_helpers import (
+    set_column_visibility,
+    show_column_visibility_menu,
+)
 
 
 class AccountTreeView(QTreeView):

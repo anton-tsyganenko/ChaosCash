@@ -1,45 +1,66 @@
 """Main application window."""
-import sqlite3
 import os
-from PyQt6.QtWidgets import (
-    QMainWindow, QSplitter, QVBoxLayout, QWidget, QHeaderView,
-    QFileDialog, QMessageBox, QApplication, QMenu, QAbstractItemView
-)
-from PyQt6.QtCore import Qt, QModelIndex, QTimer, QItemSelectionModel, QSettings
-from PyQt6.QtGui import QAction
+import sqlite3
 
-from app.i18n import tr
-from app.settings.app_settings import AppSettings
-from app.settings.display_settings import DisplaySettings
+from PyQt6.QtCore import QItemSelectionModel, QModelIndex, QSettings, Qt, QTimer
+from PyQt6.QtGui import QAction
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QFileDialog,
+    QHeaderView,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
+)
+
 from app.database.connection import open_connection
 from app.database.schema import ensure_schema
+from app.i18n import tr
 from app.repositories.account_repo import AccountRepo
-from app.repositories.transaction_repo import TransactionRepo
-from app.repositories.split_repo import SplitRepo
 from app.repositories.currency_repo import CurrencyRepo
-from app.services.balance_service import BalanceService
-from app.services.transaction_service import TransactionService
-from app.services.integrity_service import IntegrityService
+from app.repositories.split_repo import SplitRepo
+from app.repositories.transaction_repo import TransactionRepo
 from app.services.amount_formatter import AmountFormatter
-from app.ui.item_models.transaction_model import TransactionModel
-from app.ui.item_models.split_model import (
-    SplitModel, ROW_PHANTOM, ROW_NEW, COL_EXTID, COL_DESC, COL_ACCOUNT, COL_FIXED, COL_AMOUNT, COL_CURRENCY
-)
-from app.ui.widgets.account_tree_view import AccountTreeView
-from app.ui.widgets.transaction_view import TransactionView
-from app.ui.widgets.split_view import SplitView
-from app.ui.delegates.date_delegate import DateDelegate
-from app.ui.delegates.amount_delegate import AmountDelegate
+from app.services.balance_service import BalanceService
+from app.services.integrity_service import IntegrityService
+from app.services.transaction_service import TransactionService
+from app.settings.app_settings import AppSettings
+from app.settings.display_settings import DisplaySettings
 from app.ui.delegates.account_combo_delegate import AccountComboDelegate
+from app.ui.delegates.amount_delegate import AmountDelegate
 from app.ui.delegates.currency_combo_delegate import CurrencyComboDelegate
-from app.ui.dialogs.settings_dialog import SettingsDialog
+from app.ui.delegates.date_delegate import DateDelegate
 from app.ui.dialogs.currency_editor_dialog import CurrencyEditorDialog
-from app.utils.recent_files import add_recent_file, get_recent_files
+from app.ui.dialogs.settings_dialog import SettingsDialog
+from app.ui.item_models.account_tree_model import (
+    VIRTUAL_EMPTY_ID,
+    VIRTUAL_IMBALANCE_ID,
+    AccountTreeModel,
+)
+from app.ui.item_models.split_model import (
+    COL_ACCOUNT,
+    COL_AMOUNT,
+    COL_CURRENCY,
+    COL_DESC,
+    COL_EXTID,
+    COL_FIXED,
+    ROW_NEW,
+    ROW_PHANTOM,
+    SplitModel,
+)
+from app.ui.item_models.transaction_model import TransactionModel
+from app.ui.widgets.account_tree_view import AccountTreeView
+from app.ui.widgets.split_view import SplitView
+from app.ui.widgets.transaction_view import TransactionView
 from app.utils.amount_math import float_to_quants
 from app.utils.expression_parser import safe_eval
-from app.ui.item_models.account_tree_model import (
-    AccountTreeModel, VIRTUAL_IMBALANCE_ID, VIRTUAL_EMPTY_ID
-)
+from app.utils.recent_files import add_recent_file, get_recent_files
+
+
 class MainWindow(QMainWindow):
     """One main window per open database file."""
 

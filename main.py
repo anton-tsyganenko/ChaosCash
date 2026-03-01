@@ -1,8 +1,8 @@
 """ChaosCash — Personal accounting application. Entry point."""
 import argparse
-import sys
-import os
 import logging
+import os
+import sys
 
 # Ensure the project root is in the path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -10,9 +10,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 from PyQt6.QtWidgets import QApplication
 
 from app.settings.app_settings import AppSettings
-from app.utils.recent_files import get_last_file
 from app.ui.main_window import MainWindow
 from app.ui.ui_event_logger import UIEventLogger
+from app.utils.recent_files import get_last_file
 
 
 def _configure_logging(enabled: bool) -> None:
@@ -84,7 +84,14 @@ def main():
 
 def _ask_file_path() -> str | None:
     """Show file picker to open or create a database."""
-    from PyQt6.QtWidgets import QFileDialog, QPushButton, QDialog, QVBoxLayout, QHBoxLayout, QLabel
+    from PyQt6.QtWidgets import (
+        QDialog,
+        QFileDialog,
+        QHBoxLayout,
+        QLabel,
+        QPushButton,
+        QVBoxLayout,
+    )
 
     class StartupDialog(QDialog):
         def __init__(self):
