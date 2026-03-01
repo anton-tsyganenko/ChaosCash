@@ -278,7 +278,7 @@ class MainWindow(QMainWindow):
 
         # Transaction model
         self.trans_model = TransactionModel(
-            self.trans_repo, self.currency_repo, self.settings
+            self.trans_repo, self.currency_repo, self.account_repo, self.settings
         )
         self.transaction_view.setModel(self.trans_model)
         th = self.transaction_view.horizontalHeader()

@@ -18,7 +18,10 @@ SELECT
     SUM(S.Amount) OVER (PARTITION BY S.Account, S.Currency ORDER BY T.Date, T.ID, S.ID) AS Balance,
     C.Code AS CurrencyCode,
     C.Denominator,
-    S.Account AS AccountID
+    S.Account AS AccountID,
+    S.Description AS SplitDescription,
+    S.ExternalID,
+    S.AmountFixed
 FROM Trans AS T
 JOIN Split AS S ON T.ID = S.Trans
 JOIN Currency AS C ON S.Currency = C.ID
@@ -82,7 +85,10 @@ SELECT
     SUM(S.Amount) OVER (PARTITION BY S.Account, S.Currency ORDER BY T.Date, T.ID, S.ID) AS Balance,
     C.Code AS CurrencyCode,
     C.Denominator,
-    S.Account AS AccountID
+    S.Account AS AccountID,
+    S.Description AS SplitDescription,
+    S.ExternalID,
+    S.AmountFixed
 FROM Trans AS T
 LEFT JOIN Split AS S ON T.ID = S.Trans
 LEFT JOIN Currency AS C ON S.Currency = C.ID

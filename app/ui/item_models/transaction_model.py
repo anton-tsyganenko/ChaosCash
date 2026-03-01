@@ -9,6 +9,7 @@ from PyQt6.QtCore import QAbstractTableModel, QModelIndex, Qt, QTimer, pyqtSigna
 from PyQt6.QtGui import QColor
 
 from app.i18n import tr
+from app.repositories.account_repo import AccountRepo
 from app.repositories.currency_repo import CurrencyRepo
 from app.repositories.transaction_repo import TransactionRepo
 from app.utils.date_utils import qt_format_to_strftime
@@ -22,9 +23,15 @@ COL_DESC = 2
 COL_AMOUNT = 3
 COL_BALANCE = 4
 COL_CURRENCY = 5
-NUM_COLS = 6
+COL_SPLIT_ID = 6
+COL_EXT_ID = 7
+COL_SPLIT_DESC = 8
+COL_ACCOUNT = 9
+COL_FIXED = 10
+NUM_COLS = 11
 
-HEADERS = ["ID", tr("Date"), tr("Description"), tr("Amount"), tr("Balance"), tr("Currency")]
+HEADERS = ["ID", tr("Date"), tr("Transaction Description"), tr("Amount"), tr("Balance"), tr("Currency"),
+           tr("Split ID"), tr("Ext. ID"), tr("Split Description"), tr("Account"), tr("Fixed")]
 
 
 class TransactionModel(QAbstractTableModel):
@@ -38,15 +45,17 @@ class TransactionModel(QAbstractTableModel):
     new_transaction_requested = pyqtSignal(str, str)  # description, utc_date
 
     def __init__(self, trans_repo: TransactionRepo, currency_repo: CurrencyRepo,
-                 settings, parent=None):
+                 account_repo: AccountRepo, settings, parent=None):
         super().__init__(parent)
         self.trans_repo = trans_repo
         self.currency_repo = currency_repo
+        self.account_repo = account_repo
         self.settings = settings
         self._rows: list[dict] = []
         self._all_rows: list[dict] = []
         self._account_ids: list[int] = []
         self._currencies: dict[int, object] = {}
+        self._account_cache: dict[int, str] = {}
         self._local_tz: TZInfo = datetime.now().astimezone().tzinfo
 
     def _load_rows(self, rows_data: list[dict], account_ids: list[int]) -> None:
@@ -113,8 +122,9 @@ class TransactionModel(QAbstractTableModel):
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return [tr("ID"), tr("Date"), tr("Description"),
-                    tr("Amount"), tr("Balance"), tr("Currency")][section]
+            return [tr("ID"), tr("Date"), tr("Transaction Description"),
+                    tr("Amount"), tr("Balance"), tr("Currency"),
+                    tr("Split ID"), tr("Ext. ID"), tr("Split Description"), tr("Account"), tr("Fixed")][section]
         return None
 
     def _is_phantom_row(self, row: int) -> bool:
@@ -188,12 +198,36 @@ class TransactionModel(QAbstractTableModel):
                 return self._format_amt(bal, denom)
             elif col == COL_CURRENCY:
                 return row.get("CurrencyCode", "")
+            elif col == COL_SPLIT_ID:
+                split_id = row.get("SplitID")
+                return str(split_id) if split_id is not None else ""
+            elif col == COL_EXT_ID:
+                return row.get("ExternalID") or ""
+            elif col == COL_SPLIT_DESC:
+                return row.get("SplitDescription") or ""
+            elif col == COL_ACCOUNT:
+                account_id = row.get("AccountID")
+                if account_id is None:
+                    return ""
+                if account_id not in self._account_cache:
+                    try:
+                        self._account_cache[account_id] = self.account_repo.get_account_path(account_id)
+                    except Exception:
+                        self._account_cache[account_id] = str(account_id)
+                return self._account_cache[account_id]
+            elif col == COL_FIXED:
+                return "Yes" if row.get("AmountFixed") else "No"
 
         elif role == Qt.ItemDataRole.EditRole:
             if col == COL_DATE:
                 return row.get("Date", "")
             elif col == COL_DESC:
                 return row.get("Description") or ""
+
+        elif role == Qt.ItemDataRole.ForegroundRole:
+            # Read-only split columns displayed in gray
+            if col in (COL_SPLIT_ID, COL_EXT_ID, COL_SPLIT_DESC, COL_ACCOUNT, COL_FIXED):
+                return QColor(160, 160, 160)
 
         elif role == Qt.ItemDataRole.TextAlignmentRole:
             if col in (COL_AMOUNT, COL_BALANCE):
@@ -213,6 +247,7 @@ class TransactionModel(QAbstractTableModel):
             if index.column() == COL_DESC:
                 return base | Qt.ItemFlag.ItemIsEditable
             return base
+        # Only Date and Transaction Description are editable
         if index.column() in (COL_DATE, COL_DESC):
             return base | Qt.ItemFlag.ItemIsEditable
         return base
@@ -290,6 +325,24 @@ class TransactionModel(QAbstractTableModel):
                 return row.get("Balance") or 0
             if column == COL_CURRENCY:
                 return (row.get("CurrencyCode") or "").lower()
+            if column == COL_SPLIT_ID:
+                return row.get("SplitID") or 0
+            if column == COL_EXT_ID:
+                return (row.get("ExternalID") or "").lower()
+            if column == COL_SPLIT_DESC:
+                return (row.get("SplitDescription") or "").lower()
+            if column == COL_ACCOUNT:
+                account_id = row.get("AccountID")
+                if account_id is None:
+                    return ""
+                if account_id not in self._account_cache:
+                    try:
+                        self._account_cache[account_id] = self.account_repo.get_account_path(account_id)
+                    except Exception:
+                        self._account_cache[account_id] = str(account_id)
+                return self._account_cache[account_id].lower()
+            if column == COL_FIXED:
+                return 0 if row.get("AmountFixed") else 1  # No before Yes
             return 0
 
         self.layoutAboutToBeChanged.emit()
