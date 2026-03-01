@@ -471,7 +471,7 @@ class SplitModel(QAbstractTableModel):
             if column == COL_ACCOUNT:
                 return self.account_repo.get_account_path(s.account).lower()
             if column == COL_FIXED:
-                return int(bool(s.amount_fixed))
+                return s.amount_fixed
             if column == COL_AMOUNT:
                 return s.amount
             if column == COL_CURRENCY:

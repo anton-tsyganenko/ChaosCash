@@ -6,8 +6,6 @@ GET_BY_ID = "SELECT ID, Parent, Name, Code, Description, ExternalID, IsHidden FR
 
 GET_CHILDREN = "SELECT ID, Parent, Name, Code, Description, ExternalID, IsHidden FROM Account WHERE Parent = ? ORDER BY Name"
 
-GET_ROOT = "SELECT ID, Parent, Name, Code, Description, ExternalID, IsHidden FROM Account WHERE Parent IS NULL ORDER BY Name"
-
 INSERT = "INSERT INTO Account (Parent, Name, Code, Description, ExternalID, IsHidden) VALUES (?, ?, ?, ?, ?, ?)"
 
 UPDATE = "UPDATE Account SET Parent=?, Name=?, Code=?, Description=?, ExternalID=?, IsHidden=? WHERE ID=?"

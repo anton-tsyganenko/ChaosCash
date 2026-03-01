@@ -6,7 +6,6 @@ _APP = "chaoscash"
 
 _DEFAULTS = {
     "date_format": "yyyy-MM-dd HH:mm:ss",
-    "timezone": "",           # empty = system timezone
     "decimal_sep": ".",
     "thousands_sep": " ",
     "account_path_sep": ":",
