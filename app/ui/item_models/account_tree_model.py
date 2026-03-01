@@ -188,26 +188,19 @@ class AccountTreeModel(QAbstractItemModel):
             return QColor(150, 150, 150)
         return None
 
-    def _format_balance_parts(self, balance_dict: dict[int, int]) -> str:
-        """Format a balance dict {currency_id: amount} for display."""
+    def _format_balance(self, account_id: int, include_children: bool) -> str:
+        if account_id == VIRTUAL_IMBALANCE_ID:
+            balance = self.integrity_service.get_total_imbalance()
+        elif account_id < 0:
+            return ""
+        else:
+            balance = self.balance_service.get_balance(account_id, include_children=include_children)
         parts = []
-        for cid, quants in balance_dict.items():
+        for cid, quants in balance.items():
             if quants == 0:
                 continue
             parts.append(self.formatter.format_with_currency(quants, cid))
         return ", ".join(parts)
-
-    def _format_balance(self, account_id: int, include_children: bool) -> str:
-        # Handle virtual Imbalance node
-        if account_id == VIRTUAL_IMBALANCE_ID:
-            imbalance = self.integrity_service.get_total_imbalance()
-            return self._format_balance_parts(imbalance)
-        # Handle other virtual nodes (empty, etc.)
-        if account_id < 0:
-            return ""
-        # Regular account
-        balance = self.balance_service.get_balance(account_id, include_children=include_children)
-        return self._format_balance_parts(balance)
 
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole):
