@@ -96,7 +96,7 @@ WITH q AS (
         T.ID,
         T.Date,
         T.Description,
-        SUM(S.Amount) AS TotalAmount,
+        -SUM(S.Amount) AS TotalAmount,
         S.Currency,
         C.Code AS CurrencyCode,
         C.Denominator
