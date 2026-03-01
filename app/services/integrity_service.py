@@ -26,10 +26,10 @@ class IntegrityService:
         """Return IDs of splits with Amount=0."""
         return self.split_repo.get_splits_with_zero_amount()
 
-    def check_foreign_keys(self) -> list[str]:
-        """Run PRAGMA foreign_key_check and return any violations as strings."""
+    def check_foreign_keys(self) -> list[dict]:
+        """Run PRAGMA foreign_key_check and return any violations as dicts."""
         rows = self.conn.execute("PRAGMA foreign_key_check").fetchall()
-        return [str(dict(r)) for r in rows]
+        return [dict(r) for r in rows]
 
     def has_imbalance(self) -> bool:
         return bool(self.get_imbalanced_trans_ids())

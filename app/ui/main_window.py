@@ -7,14 +7,18 @@ from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QApplication,
+    QDialog,
     QFileDialog,
     QHeaderView,
     QMainWindow,
     QMenu,
     QMessageBox,
     QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
+    QLabel,
 )
 
 from app.database.connection import open_connection
@@ -98,6 +102,10 @@ class MainWindow(QMainWindow):
         self._split_display = DisplaySettings("splits")
 
         self._setup_ui()
+
+        # Check FK violations before any database operations
+        self._check_foreign_keys()
+
         self._setup_menu()
         self._setup_models()
         self._setup_delegates()
@@ -851,19 +859,49 @@ class MainWindow(QMainWindow):
         else:
             self._load_transactions()
 
+    def _check_foreign_keys(self):
+        """Check foreign key violations before any database operations.
+
+        Shows a dialog with all violations in a table if any are found.
+        """
+        violations = self.integrity_service.check_foreign_keys()
+        if violations:
+            # Create a dialog with table to show all violations
+            dialog = QDialog(self)
+            dialog.setWindowTitle(tr("Database Integrity Warning"))
+            dialog.setMinimumWidth(400)
+
+            layout = QVBoxLayout(dialog)
+
+            label = QLabel(tr("Foreign Key violations found:"))
+            layout.addWidget(label)
+
+            # Create table with columns
+            table = QTableWidget(dialog)
+            table.setColumnCount(4)
+            table.setHorizontalHeaderLabels(
+                [tr("Table"), tr("Row ID"), tr("Parent Table"), tr("FK ID")]
+            )
+            table.setRowCount(len(violations))
+
+            # Populate table with violation data
+            for row, violation in enumerate(violations):
+                table.setItem(row, 0, QTableWidgetItem(str(violation.get("table", ""))))
+                table.setItem(row, 1, QTableWidgetItem(str(violation.get("rowid", ""))))
+                table.setItem(row, 2, QTableWidgetItem(str(violation.get("parent", ""))))
+                table.setItem(row, 3, QTableWidgetItem(str(violation.get("fkid", ""))))
+
+            # Resize columns to content
+            table.resizeColumnsToContents()
+            layout.addWidget(table)
+
+            dialog.exec()
+
     def _refresh_integrity(self):
         has_imbalance = self.integrity_service.has_imbalance()
         has_empty = self.integrity_service.has_empty_transactions()
         self.account_model.set_virtual_nodes(has_imbalance, has_empty)
         self.account_tree.expandAll()
-
-        # Check FK violations on startup
-        violations = self.integrity_service.check_foreign_keys()
-        if violations:
-            QMessageBox.warning(
-                self, tr("Database Integrity Warning"),
-                tr("Foreign key violations detected:\n") + "\n".join(violations[:10])
-            )
 
     def _refresh_recent_menu(self):
         self.recent_menu.clear()
