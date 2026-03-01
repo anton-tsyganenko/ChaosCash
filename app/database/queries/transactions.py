@@ -58,6 +58,13 @@ GROUP BY Trans, Currency
 HAVING SUM(Amount) <> 0
 """
 
+GET_TOTAL_IMBALANCE = """
+SELECT Currency, -SUM(Amount) AS Imbalance
+FROM Split
+GROUP BY Currency
+HAVING SUM(Amount) <> 0
+"""
+
 GET_EMPTY = """
 SELECT T.ID, T.Date, T.Description
 FROM Trans T
