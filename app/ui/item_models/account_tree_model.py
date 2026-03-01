@@ -42,13 +42,15 @@ class AccountTreeModel(QAbstractItemModel):
     """Hierarchical model of accounts with optional virtual nodes."""
 
     def __init__(self, account_repo: AccountRepo, balance_service: BalanceService,
-                 currency_repo: CurrencyRepo, settings, formatter: AmountFormatter, parent=None):
+                 currency_repo: CurrencyRepo, settings, formatter: AmountFormatter,
+                 integrity_service, parent=None):
         super().__init__(parent)
         self.account_repo = account_repo
         self.balance_service = balance_service
         self.currency_repo = currency_repo
         self.settings = settings
         self.formatter = formatter
+        self.integrity_service = integrity_service
 
         self._root = AccountNode(None, None)
         self._id_to_node: dict[int, AccountNode] = {}
@@ -163,12 +165,16 @@ class AccountTreeModel(QAbstractItemModel):
             if col == COL_DESCRIPTION:
                 return acc.description or ""
             if col == COL_TOTAL_BALANCE:
-                if role == Qt.ItemDataRole.EditRole or node.is_virtual:
-                    return None if role == Qt.ItemDataRole.EditRole else ""
+                if role == Qt.ItemDataRole.EditRole:
+                    return None if node.is_virtual else None
+                if node.is_virtual and acc.id != VIRTUAL_IMBALANCE_ID:
+                    return ""
                 return self._format_balance(acc.id, include_children=True)
             if col == COL_OWN_BALANCE:
-                if role == Qt.ItemDataRole.EditRole or node.is_virtual:
-                    return None if role == Qt.ItemDataRole.EditRole else ""
+                if role == Qt.ItemDataRole.EditRole:
+                    return None if node.is_virtual else None
+                if node.is_virtual and acc.id != VIRTUAL_IMBALANCE_ID:
+                    return ""
                 return self._format_balance(acc.id, include_children=False)
             return None
 
@@ -182,10 +188,13 @@ class AccountTreeModel(QAbstractItemModel):
             return QColor(150, 150, 150)
         return None
 
-    def _format_balance(self, account_id: int | None, include_children: bool) -> str:
-        if account_id is None or account_id < 0:
+    def _format_balance(self, account_id: int, include_children: bool) -> str:
+        if account_id == VIRTUAL_IMBALANCE_ID:
+            balance = self.integrity_service.get_total_imbalance()
+        elif account_id < 0:
             return ""
-        balance = self.balance_service.get_balance(account_id, include_children=include_children)
+        else:
+            balance = self.balance_service.get_balance(account_id, include_children=include_children)
         parts = []
         for cid, quants in balance.items():
             if quants == 0:

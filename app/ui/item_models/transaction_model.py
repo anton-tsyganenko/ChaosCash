@@ -45,14 +45,18 @@ class TransactionModel(QAbstractTableModel):
         self._currencies: dict[int, object] = {}
         self._local_tz: TZInfo = datetime.now().astimezone().tzinfo
 
+    def _load_rows(self, rows_data: list[dict], account_ids: list[int]) -> None:
+        """Internal method to initialize row data after fetch. Called by load() and load_by_ids()."""
+        self._all_rows = rows_data
+        self._rows = rows_data[:FETCH_BLOCK]
+        self._account_ids = account_ids
+
     def load(self, account_ids: list[int]) -> None:
         self.beginResetModel()
-        self._account_ids = account_ids
         self._currencies = {c.id: c for c in self.currency_repo.get_all()}
 
         if not account_ids:
-            self._all_rows = []
-            self._rows = []
+            self._load_rows([], account_ids)
             self.endResetModel()
             return
 
@@ -62,19 +66,16 @@ class TransactionModel(QAbstractTableModel):
         else:
             raw = self.trans_repo.get_summary_by_accounts(account_ids)
 
-        self._all_rows = raw
-        self._rows = raw[:FETCH_BLOCK]
+        self._load_rows(raw, account_ids)
         self.endResetModel()
 
     def load_by_ids(self, trans_ids: list[int]) -> None:
         """Load specific transactions by ID (for virtual nodes: imbalance, empty)."""
         self.beginResetModel()
-        self._account_ids = []  # no phantom row for virtual node views
         self._currencies = {c.id: c for c in self.currency_repo.get_all()}
 
         if not trans_ids:
-            self._all_rows = []
-            self._rows = []
+            self._load_rows([], [])  # no phantom row for virtual node views
             self.endResetModel()
             return
 
@@ -82,8 +83,7 @@ class TransactionModel(QAbstractTableModel):
         # transaction+currency showing the net imbalance.
         raw = self.trans_repo.get_summary_by_ids(trans_ids)
 
-        self._all_rows = raw
-        self._rows = raw[:FETCH_BLOCK]
+        self._load_rows(raw, [])  # no phantom row for virtual node views
         self.endResetModel()
 
     def canFetchMore(self, parent: QModelIndex = QModelIndex()) -> bool:

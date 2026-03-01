@@ -35,3 +35,7 @@ class IntegrityService:
 
     def has_empty_transactions(self) -> bool:
         return bool(self.get_empty_transactions())
+
+    def get_total_imbalance(self) -> dict[int, int]:
+        """Return total imbalance per currency as dict {currency_id: imbalance_amount}."""
+        return self.trans_repo.get_total_imbalance()

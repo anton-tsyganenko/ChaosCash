@@ -233,7 +233,8 @@ class MainWindow(QMainWindow):
         # Account tree model
         self.account_model = AccountTreeModel(
             self.account_repo, self.balance_service,
-            self.currency_repo, self.settings, self.amount_formatter
+            self.currency_repo, self.settings, self.amount_formatter,
+            self.integrity_service
         )
         self.account_tree.setModel(self.account_model)
         self.account_tree.expandAll()

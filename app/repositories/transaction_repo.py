@@ -56,3 +56,8 @@ class TransactionRepo:
     def get_empty(self) -> list[Transaction]:
         rows = self.conn.execute(Q.GET_EMPTY).fetchall()
         return [_row_to_trans(r) for r in rows]
+
+    def get_total_imbalance(self) -> dict[int, int]:
+        """Return total imbalance per currency as dict {currency_id: imbalance_amount}."""
+        rows = self.conn.execute(Q.GET_TOTAL_IMBALANCE).fetchall()
+        return {row["Currency"]: row["Imbalance"] for row in rows}
