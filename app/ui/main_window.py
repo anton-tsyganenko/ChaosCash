@@ -282,12 +282,25 @@ class MainWindow(QMainWindow):
         )
         self.transaction_view.setModel(self.trans_model)
         th = self.transaction_view.horizontalHeader()
-        th.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+
+        # Hide columns by default (except: Date, Transaction Description, Amount, Balance, Currency)
+        # Columns: 0=ID, 1=Split ID, 2=Ext. ID, 3=Date, 4=Desc, 5=Split Desc, 6=Account, 7=Amount, 8=Balance, 9=Currency
+        self.transaction_view.setColumnHidden(0, True)   # Transaction ID
+        self.transaction_view.setColumnHidden(1, True)   # Split ID
+        self.transaction_view.setColumnHidden(2, True)   # Ext. ID
+        self.transaction_view.setColumnHidden(5, True)   # Split Description
+        self.transaction_view.setColumnHidden(6, True)   # Account
+
+        # Set column sizing modes
+        for col in range(self.trans_model.columnCount()):
+            th.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
+        th.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)  # Transaction Description - stretch
+
+        # Set column widths
         date_width = self.transaction_view.fontMetrics().horizontalAdvance(
             self.settings.date_format
         ) + 20
-        th.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
-        th.resizeSection(1, date_width)
+        th.resizeSection(3, date_width)  # Date column
 
         # Split model
         self.split_model = SplitModel(

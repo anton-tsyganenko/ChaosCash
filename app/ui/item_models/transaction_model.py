@@ -18,20 +18,19 @@ UTC = timezone.utc
 FETCH_BLOCK = 500
 
 COL_ID = 0
-COL_DATE = 1
-COL_DESC = 2
-COL_AMOUNT = 3
-COL_BALANCE = 4
-COL_CURRENCY = 5
-COL_SPLIT_ID = 6
-COL_EXT_ID = 7
-COL_SPLIT_DESC = 8
-COL_ACCOUNT = 9
-COL_FIXED = 10
-NUM_COLS = 11
+COL_SPLIT_ID = 1
+COL_EXT_ID = 2
+COL_DATE = 3
+COL_DESC = 4
+COL_SPLIT_DESC = 5
+COL_ACCOUNT = 6
+COL_AMOUNT = 7
+COL_BALANCE = 8
+COL_CURRENCY = 9
+NUM_COLS = 10
 
-HEADERS = ["ID", tr("Date"), tr("Transaction Description"), tr("Amount"), tr("Balance"), tr("Currency"),
-           tr("Split ID"), tr("Ext. ID"), tr("Split Description"), tr("Account"), tr("Fixed")]
+HEADERS = [tr("Transaction ID"), tr("Split ID"), tr("Ext. ID"), tr("Date"), tr("Transaction Description"),
+           tr("Split Description"), tr("Account"), tr("Amount"), tr("Balance"), tr("Currency")]
 
 
 class TransactionModel(QAbstractTableModel):
@@ -122,9 +121,8 @@ class TransactionModel(QAbstractTableModel):
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return [tr("ID"), tr("Date"), tr("Transaction Description"),
-                    tr("Amount"), tr("Balance"), tr("Currency"),
-                    tr("Split ID"), tr("Ext. ID"), tr("Split Description"), tr("Account"), tr("Fixed")][section]
+            return [tr("Transaction ID"), tr("Split ID"), tr("Ext. ID"), tr("Date"), tr("Transaction Description"),
+                    tr("Split Description"), tr("Account"), tr("Amount"), tr("Balance"), tr("Currency")][section]
         return None
 
     def _is_phantom_row(self, row: int) -> bool:
@@ -184,25 +182,15 @@ class TransactionModel(QAbstractTableModel):
         if role == Qt.ItemDataRole.DisplayRole:
             if col == COL_ID:
                 return str(row.get("ID", ""))
-            elif col == COL_DATE:
-                return self._format_date(row.get("Date", ""))
-            elif col == COL_DESC:
-                return row.get("Description") or ""
-            elif col == COL_AMOUNT:
-                amt = row.get("Amount") if "Amount" in row else row.get("TotalAmount")
-                denom = row.get("Denominator", 100)
-                return self._format_amt(amt, denom)
-            elif col == COL_BALANCE:
-                bal = row.get("Balance")
-                denom = row.get("Denominator", 100)
-                return self._format_amt(bal, denom)
-            elif col == COL_CURRENCY:
-                return row.get("CurrencyCode", "")
             elif col == COL_SPLIT_ID:
                 split_id = row.get("SplitID")
                 return str(split_id) if split_id is not None else ""
             elif col == COL_EXT_ID:
                 return row.get("ExternalID") or ""
+            elif col == COL_DATE:
+                return self._format_date(row.get("Date", ""))
+            elif col == COL_DESC:
+                return row.get("Description") or ""
             elif col == COL_SPLIT_DESC:
                 return row.get("SplitDescription") or ""
             elif col == COL_ACCOUNT:
@@ -215,19 +203,22 @@ class TransactionModel(QAbstractTableModel):
                     except Exception:
                         self._account_cache[account_id] = str(account_id)
                 return self._account_cache[account_id]
-            elif col == COL_FIXED:
-                return "Yes" if row.get("AmountFixed") else "No"
+            elif col == COL_AMOUNT:
+                amt = row.get("Amount") if "Amount" in row else row.get("TotalAmount")
+                denom = row.get("Denominator", 100)
+                return self._format_amt(amt, denom)
+            elif col == COL_BALANCE:
+                bal = row.get("Balance")
+                denom = row.get("Denominator", 100)
+                return self._format_amt(bal, denom)
+            elif col == COL_CURRENCY:
+                return row.get("CurrencyCode", "")
 
         elif role == Qt.ItemDataRole.EditRole:
             if col == COL_DATE:
                 return row.get("Date", "")
             elif col == COL_DESC:
                 return row.get("Description") or ""
-
-        elif role == Qt.ItemDataRole.ForegroundRole:
-            # Read-only split columns displayed in gray
-            if col in (COL_SPLIT_ID, COL_EXT_ID, COL_SPLIT_DESC, COL_ACCOUNT, COL_FIXED):
-                return QColor(160, 160, 160)
 
         elif role == Qt.ItemDataRole.TextAlignmentRole:
             if col in (COL_AMOUNT, COL_BALANCE):
@@ -315,20 +306,14 @@ class TransactionModel(QAbstractTableModel):
         def key(row: dict):
             if column == COL_ID:
                 return row.get("ID") or 0
-            if column == COL_DATE:
-                return row.get("Date") or ""
-            if column == COL_DESC:
-                return (row.get("Description") or "").lower()
-            if column == COL_AMOUNT:
-                return row.get("Amount") if "Amount" in row else (row.get("TotalAmount") or 0)
-            if column == COL_BALANCE:
-                return row.get("Balance") or 0
-            if column == COL_CURRENCY:
-                return (row.get("CurrencyCode") or "").lower()
             if column == COL_SPLIT_ID:
                 return row.get("SplitID") or 0
             if column == COL_EXT_ID:
                 return (row.get("ExternalID") or "").lower()
+            if column == COL_DATE:
+                return row.get("Date") or ""
+            if column == COL_DESC:
+                return (row.get("Description") or "").lower()
             if column == COL_SPLIT_DESC:
                 return (row.get("SplitDescription") or "").lower()
             if column == COL_ACCOUNT:
@@ -341,8 +326,12 @@ class TransactionModel(QAbstractTableModel):
                     except Exception:
                         self._account_cache[account_id] = str(account_id)
                 return self._account_cache[account_id].lower()
-            if column == COL_FIXED:
-                return 0 if row.get("AmountFixed") else 1  # No before Yes
+            if column == COL_AMOUNT:
+                return row.get("Amount") if "Amount" in row else (row.get("TotalAmount") or 0)
+            if column == COL_BALANCE:
+                return row.get("Balance") or 0
+            if column == COL_CURRENCY:
+                return (row.get("CurrencyCode") or "").lower()
             return 0
 
         self.layoutAboutToBeChanged.emit()
