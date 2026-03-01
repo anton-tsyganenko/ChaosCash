@@ -43,7 +43,7 @@ class AccountTreeModel(QAbstractItemModel):
 
     def __init__(self, account_repo: AccountRepo, balance_service: BalanceService,
                  currency_repo: CurrencyRepo, settings, formatter: AmountFormatter,
-                 integrity_service=None, parent=None):
+                 integrity_service, parent=None):
         super().__init__(parent)
         self.account_repo = account_repo
         self.balance_service = balance_service
@@ -188,29 +188,26 @@ class AccountTreeModel(QAbstractItemModel):
             return QColor(150, 150, 150)
         return None
 
-    def _format_balance(self, account_id: int | None, include_children: bool) -> str:
-        if account_id is None:
-            return ""
-        # Handle virtual Imbalance node
-        if account_id == VIRTUAL_IMBALANCE_ID:
-            if not self.integrity_service:
-                return ""
-            imbalance = self.integrity_service.get_total_imbalance()
-            parts = []
-            for cid, quants in imbalance.items():
-                if quants == 0:
-                    continue
-                parts.append(self.formatter.format_with_currency(quants, cid))
-            return ", ".join(parts)
-        if account_id < 0:
-            return ""
-        balance = self.balance_service.get_balance(account_id, include_children=include_children)
+    def _format_balance_parts(self, balance_dict: dict[int, int]) -> str:
+        """Format a balance dict {currency_id: amount} for display."""
         parts = []
-        for cid, quants in balance.items():
+        for cid, quants in balance_dict.items():
             if quants == 0:
                 continue
             parts.append(self.formatter.format_with_currency(quants, cid))
         return ", ".join(parts)
+
+    def _format_balance(self, account_id: int, include_children: bool) -> str:
+        # Handle virtual Imbalance node
+        if account_id == VIRTUAL_IMBALANCE_ID:
+            imbalance = self.integrity_service.get_total_imbalance()
+            return self._format_balance_parts(imbalance)
+        # Handle other virtual nodes (empty, etc.)
+        if account_id < 0:
+            return ""
+        # Regular account
+        balance = self.balance_service.get_balance(account_id, include_children=include_children)
+        return self._format_balance_parts(balance)
 
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole):
