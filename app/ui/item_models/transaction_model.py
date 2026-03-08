@@ -196,10 +196,7 @@ class TransactionModel(QAbstractTableModel):
                 account_id = row.get("AccountID")
                 if account_id is None:
                     return ""
-                try:
-                    return self.account_repo.get_account_path(account_id)
-                except Exception:
-                    return str(account_id)
+                return self.account_repo.get_account_path(account_id)
             elif col == COL_AMOUNT:
                 amt = row.get("Amount") if "Amount" in row else row.get("TotalAmount")
                 denom = row.get("Denominator", 100)
@@ -317,10 +314,7 @@ class TransactionModel(QAbstractTableModel):
                 account_id = row.get("AccountID")
                 if account_id is None:
                     return ""
-                try:
-                    return self.account_repo.get_account_path(account_id).lower()
-                except Exception:
-                    return str(account_id).lower()
+                return self.account_repo.get_account_path(account_id).lower()
             if column == COL_AMOUNT:
                 return row.get("Amount") if "Amount" in row else (row.get("TotalAmount") or 0)
             if column == COL_BALANCE:
