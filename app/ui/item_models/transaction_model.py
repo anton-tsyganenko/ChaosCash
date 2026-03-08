@@ -29,7 +29,7 @@ COL_BALANCE = 8
 COL_CURRENCY = 9
 NUM_COLS = 10
 
-HEADERS = [tr("Transaction ID"), tr("Split ID"), tr("Ext. ID"), tr("Date"), tr("Transaction Description"),
+HEADERS = [tr("Transaction ID"), tr("Split ID"), tr("External ID"), tr("Date"), tr("Transaction Description"),
            tr("Split Description"), tr("Account"), tr("Amount"), tr("Balance"), tr("Currency")]
 
 
@@ -120,7 +120,7 @@ class TransactionModel(QAbstractTableModel):
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            return [tr("Transaction ID"), tr("Split ID"), tr("Ext. ID"), tr("Date"), tr("Transaction Description"),
+            return [tr("Transaction ID"), tr("Split ID"), tr("External ID"), tr("Date"), tr("Transaction Description"),
                     tr("Split Description"), tr("Account"), tr("Amount"), tr("Balance"), tr("Currency")][section]
         return None
 
