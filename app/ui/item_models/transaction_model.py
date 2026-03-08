@@ -194,8 +194,6 @@ class TransactionModel(QAbstractTableModel):
                 return row.get("SplitDescription") or ""
             elif col == COL_ACCOUNT:
                 account_id = row.get("AccountID")
-                if account_id is None:
-                    return ""
                 return self.account_repo.get_account_path(account_id)
             elif col == COL_AMOUNT:
                 amt = row.get("Amount") if "Amount" in row else row.get("TotalAmount")
@@ -312,8 +310,6 @@ class TransactionModel(QAbstractTableModel):
                 return (row.get("SplitDescription") or "").lower()
             if column == COL_ACCOUNT:
                 account_id = row.get("AccountID")
-                if account_id is None:
-                    return ""
                 return self.account_repo.get_account_path(account_id).lower()
             if column == COL_AMOUNT:
                 return row.get("Amount") if "Amount" in row else (row.get("TotalAmount") or 0)
