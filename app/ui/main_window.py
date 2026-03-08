@@ -283,14 +283,6 @@ class MainWindow(QMainWindow):
         self.transaction_view.setModel(self.trans_model)
         th = self.transaction_view.horizontalHeader()
 
-        # Hide columns by default (except: Date, Transaction Description, Amount, Balance, Currency)
-        # Columns: 0=ID, 1=Split ID, 2=Ext. ID, 3=Date, 4=Desc, 5=Split Desc, 6=Account, 7=Amount, 8=Balance, 9=Currency
-        self.transaction_view.setColumnHidden(0, True)   # Transaction ID
-        self.transaction_view.setColumnHidden(1, True)   # Split ID
-        self.transaction_view.setColumnHidden(2, True)   # Ext. ID
-        self.transaction_view.setColumnHidden(5, True)   # Split Description
-        self.transaction_view.setColumnHidden(6, True)   # Account
-
         # Set column sizing modes
         for col in range(self.trans_model.columnCount()):
             th.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
@@ -439,7 +431,7 @@ class MainWindow(QMainWindow):
             self.transaction_view, self.transaction_view.horizontalHeader(), self._trans_display,
             default_order=list(range(self.trans_model.columnCount())),
             default_widths={},
-            default_hidden=[],
+            default_hidden=[0, 1, 2, 5, 6],  # Hide: Transaction ID, Split ID, Ext. ID, Split Description, Account
             default_sort_col=1,
             default_sort_order=Qt.SortOrder.AscendingOrder,
         )
