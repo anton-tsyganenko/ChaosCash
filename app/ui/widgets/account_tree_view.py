@@ -340,10 +340,6 @@ class AccountTreeView(QTreeView):
         if model is None:
             return
 
-        # Clear previous highlight
-        if self._current_drop_target is not None and self._current_drop_target.isValid():
-            self.dataChanged.emit(self._current_drop_target, self._current_drop_target)
-
         # Get dragged IDs for validation
         dragged_indexes = self.selectedIndexes()
         dragged_ids = set()
@@ -365,9 +361,8 @@ class AccountTreeView(QTreeView):
                     is_valid_drop = False
                     break
 
-        # Update current target and apply visual feedback
+        # Update current target
         self._current_drop_target = target_index
-        self.dataChanged.emit(target_index, target_index)
 
         # Set cursor based on validity
         if is_valid_drop:
@@ -378,12 +373,6 @@ class AccountTreeView(QTreeView):
     def _clear_drop_target(self):
         """Clear the drop target highlight and restore cursor."""
         self.unsetCursor()
-
-        if self._current_drop_target is not None and self._current_drop_target.isValid():
-            model = self.model()
-            if model is not None:
-                self.dataChanged.emit(self._current_drop_target, self._current_drop_target)
-
         self._current_drop_target = None
 
     def startDrag(self, supported_actions):
