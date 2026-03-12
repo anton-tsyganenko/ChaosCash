@@ -151,7 +151,7 @@ class SplitModel(QAbstractTableModel):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return [
                 tr("ID"),
-                tr("Ext. ID"),
+                tr("External ID"),
                 tr("Description"),
                 tr("Account"),
                 tr("Fixed"),

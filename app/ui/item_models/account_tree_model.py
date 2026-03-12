@@ -209,7 +209,7 @@ class AccountTreeModel(QAbstractItemModel):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             return [
                 tr("Account"), tr("Total Balance"), tr("Own Balance"), tr("Hidden"),
-                tr("Code"), tr("Ext. ID"), tr("Description"),
+                tr("Code"), tr("External ID"), tr("Description"),
             ][section]
         return None
 

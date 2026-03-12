@@ -278,16 +278,21 @@ class MainWindow(QMainWindow):
 
         # Transaction model
         self.trans_model = TransactionModel(
-            self.trans_repo, self.currency_repo, self.settings
+            self.trans_repo, self.currency_repo, self.account_repo, self.settings
         )
         self.transaction_view.setModel(self.trans_model)
         th = self.transaction_view.horizontalHeader()
-        th.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+
+        # Set column sizing modes
+        for col in range(self.trans_model.columnCount()):
+            th.setSectionResizeMode(col, QHeaderView.ResizeMode.Interactive)
+        th.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)  # Transaction Description - stretch
+
+        # Set column widths
         date_width = self.transaction_view.fontMetrics().horizontalAdvance(
             self.settings.date_format
         ) + 20
-        th.setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
-        th.resizeSection(1, date_width)
+        th.resizeSection(3, date_width)  # Date column
 
         # Split model
         self.split_model = SplitModel(
@@ -418,7 +423,7 @@ class MainWindow(QMainWindow):
             self.account_tree, self.account_tree.header(), self._acc_display,
             default_order=list(range(self.account_model.columnCount())),
             default_widths={0: 220, 1: 130, 2: 130, 3: 60, 4: 90, 5: 120, 6: 220},
-            default_hidden=[],
+            default_hidden=[2, 3, 4, 5, 6],  # Hide: Own Balance, Hidden, Code, External ID, Description
             default_sort_col=0,
             default_sort_order=Qt.SortOrder.AscendingOrder,
         )
@@ -426,7 +431,7 @@ class MainWindow(QMainWindow):
             self.transaction_view, self.transaction_view.horizontalHeader(), self._trans_display,
             default_order=list(range(self.trans_model.columnCount())),
             default_widths={},
-            default_hidden=[],
+            default_hidden=[0, 1, 2, 5, 6],  # Hide: Transaction ID, Split ID, External ID, Split Description, Account
             default_sort_col=1,
             default_sort_order=Qt.SortOrder.AscendingOrder,
         )
@@ -434,7 +439,7 @@ class MainWindow(QMainWindow):
             self.split_view, self.split_view.horizontalHeader(), self._split_display,
             default_order=list(range(self.split_model.columnCount())),
             default_widths={0: 70, 1: 80, 3: 150, 4: 50, 5: 100, 6: 70},
-            default_hidden=[],
+            default_hidden=[0, 1],  # Hide: ID, External ID
             default_sort_col=6,
             default_sort_order=Qt.SortOrder.AscendingOrder,
         )
