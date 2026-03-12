@@ -408,42 +408,51 @@ class AccountTreeView(QTreeView):
         else:
             text = f"{account_names[0]} (+{len(account_names) - 1})"
 
-        # Get MIME data first
         mime = model.mimeData(selected_indexes)
-        if not mime:
-            super().startDrag(supported_actions)
-            return
 
-        # Build pixmap via QImage so we get a proper ARGB32 surface
+        # --- drag label pixmap ---
         font = QFont()
         font.setPointSize(11)
         font.setBold(True)
-
         from PyQt6.QtGui import QFontMetrics
         fm = QFontMetrics(font)
-        text_width = max(fm.horizontalAdvance(text) + 24, 60)
-        text_height = max(fm.height() + 12, 30)
+        w = max(fm.horizontalAdvance(text) + 24, 60)
+        h = max(fm.height() + 12, 30)
 
-        image = QImage(text_width, text_height, QImage.Format.Format_ARGB32_Premultiplied)
-        image.fill(QColor(76, 175, 80, 220))  # semi-transparent green
-
-        painter = QPainter(image)
+        # Plain QPixmap (no alpha channel) — most reliable across platforms
+        pixmap = QPixmap(w, h)
+        pixmap.fill(QColor(76, 175, 80))          # solid Material-Green background
+        painter = QPainter(pixmap)
         painter.setFont(font)
         painter.setPen(QPen(QColor(27, 94, 32), 2))
-        painter.drawRect(0, 0, text_width - 1, text_height - 1)
+        painter.drawRect(1, 1, w - 2, h - 2)      # dark-green border
         painter.setPen(QColor(255, 255, 255))
-        painter.drawText(image.rect(), Qt.AlignmentFlag.AlignCenter, text)
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, text)
         painter.end()
 
-        pixmap = QPixmap.fromImage(image)
+        # --- closed-hand drag cursor ---
+        cs = 24
+        cimg = QImage(cs, cs, QImage.Format.Format_ARGB32)
+        cimg.fill(QColor(0, 0, 0, 0))
+        cp = QPainter(cimg)
+        cp.setRenderHint(QPainter.RenderHint.Antialiasing)
+        skin = QColor(255, 210, 120)
+        outline = QColor(130, 80, 10)
+        cp.setBrush(QBrush(skin))
+        cp.setPen(QPen(outline, 1.5))
+        cp.drawRoundedRect(3, 3, 18, 10, 3, 3)   # four fingers (top row)
+        cp.drawRoundedRect(3, 10, 18, 12, 3, 3)  # palm
+        cp.drawRoundedRect(0, 13, 7, 7, 3, 3)    # thumb
+        cp.end()
+        cursor_pm = QPixmap.fromImage(cimg)
 
-        # Create and execute drag
         drag = QDrag(self)
+        drag.setMimeData(mime)
         drag.setPixmap(pixmap)
         drag.setHotSpot(pixmap.rect().center())
-        drag.setMimeData(mime)
+        drag.setDragCursor(cursor_pm, Qt.DropAction.MoveAction)
 
-        drag.exec(supported_actions)
+        drag.exec(supported_actions, Qt.DropAction.MoveAction)
 
     def _would_create_cycle(self, moved_id: int, new_parent_id: int | None,
                              model: AccountTreeModel) -> bool:
