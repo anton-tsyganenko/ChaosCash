@@ -320,9 +320,7 @@ class AccountTreeView(QTreeView):
 
         for moved_id in dragged_ids:
             if self._would_create_cycle(moved_id, target_id, model):
-                from PyQt6.QtWidgets import QMessageBox
-                QMessageBox.warning(self, tr("Invalid Move"),
-                                    tr("Cannot move an account into itself or its descendants."))
+                # Silently reject invalid drop - user already saw red highlight
                 event.ignore()
                 return
 
@@ -370,7 +368,7 @@ class AccountTreeView(QTreeView):
 
         # Set cursor based on validity
         if is_valid_drop:
-            self.setCursor(QCursor(Qt.CursorShape.OpenHandCursor))
+            self.setCursor(QCursor(Qt.CursorShape.ClosedHandCursor))
         else:
             self.setCursor(QCursor(Qt.CursorShape.ForbiddenCursor))
 
@@ -407,19 +405,26 @@ class AccountTreeView(QTreeView):
 
         # Create pixmap with text
         font = QFont()
-        font.setPointSize(10)
+        font.setPointSize(11)
+        font.setBold(True)
         metrics = self.fontMetrics()
-        text_width = metrics.horizontalAdvance(text) + 20
-        text_height = metrics.height() + 10
+        text_width = metrics.horizontalAdvance(text) + 24
+        text_height = metrics.height() + 12
 
         pixmap = QPixmap(text_width, text_height)
-        pixmap.fill(QColor(200, 230, 201, 200))  # Light green with transparency
+        pixmap.fill(Qt.GlobalColor.transparent)
 
         painter = QPainter(pixmap)
         painter.setFont(font)
-        painter.setPen(QPen(QColor(27, 94, 32)))  # Dark green text
-        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, text)
+
+        # Draw background with border
+        painter.fillRect(pixmap.rect(), QBrush(QColor(76, 175, 80, 230)))  # Material Green
+        painter.setPen(QPen(QColor(27, 94, 32, 255), 2))  # Dark green border
         painter.drawRect(0, 0, pixmap.width() - 1, pixmap.height() - 1)
+
+        # Draw text
+        painter.setPen(QPen(QColor(255, 255, 255, 255)))  # White text
+        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, text)
         painter.end()
 
         # Start drag with custom pixmap
@@ -484,9 +489,9 @@ class AccountTreeView(QTreeView):
                 # Draw highlight background
                 painter.save()
                 if is_valid_drop:
-                    # Green for valid drop
-                    painter.fillRect(option.rect, QBrush(QColor(200, 230, 201, 100)))
+                    # Bright green for valid drop
+                    painter.fillRect(option.rect, QBrush(QColor(102, 187, 106, 180)))
                 else:
-                    # Red for invalid drop
-                    painter.fillRect(option.rect, QBrush(QColor(255, 205, 210, 100)))
+                    # Bright red for invalid drop
+                    painter.fillRect(option.rect, QBrush(QColor(239, 83, 80, 180)))
                 painter.restore()
