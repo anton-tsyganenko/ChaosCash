@@ -1,7 +1,7 @@
 """Account tree view with context menu and drag-and-drop."""
 from PyQt6.QtCore import QItemSelectionModel, QMimeData, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import (
-    QAction, QBrush, QColor, QCursor, QDrag, QFont, QPainter, QPen, QPixmap
+    QAction, QBrush, QColor, QCursor, QDrag, QFont, QImage, QPainter, QPen, QPixmap
 )
 from PyQt6.QtWidgets import QAbstractItemView, QApplication, QMenu, QTreeView
 
@@ -37,6 +37,7 @@ class AccountTreeView(QTreeView):
 
         # Track the current drop target for visual feedback
         self._current_drop_target: QModelIndex | None = None
+        self._current_drop_valid: bool = True
         self._drag_in_progress = False
 
         self.setSelectionMode(QTreeView.SelectionMode.ExtendedSelection)
@@ -271,7 +272,7 @@ class AccountTreeView(QTreeView):
             self._drag_in_progress = True
             target_index = self.indexAt(event.position().toPoint())
             if target_index.isValid():
-                self._update_drop_target(target_index, event)
+                self._update_drop_target(target_index)
             event.acceptProposedAction()
         else:
             event.ignore()
@@ -283,10 +284,14 @@ class AccountTreeView(QTreeView):
 
         target_index = self.indexAt(event.position().toPoint())
         if target_index.isValid():
-            self._update_drop_target(target_index, event)
+            is_valid = self._update_drop_target(target_index)
+            if is_valid:
+                event.acceptProposedAction()  # OS shows move cursor
+            else:
+                event.ignore()  # OS shows forbidden cursor automatically
         else:
             self._clear_drop_target()
-        event.acceptProposedAction()
+            event.acceptProposedAction()
 
     def dragLeaveEvent(self, event):
         self._clear_drop_target()
@@ -332,52 +337,50 @@ class AccountTreeView(QTreeView):
         self.expandAll()
         event.accept()
 
-    def _update_drop_target(self, target_index: QModelIndex, event):
-        """Update visual feedback for drop target with cursor indication."""
+    def _update_drop_target(self, target_index: QModelIndex) -> bool:
+        """Update visual highlight for drop target. Returns True if drop is valid."""
         model: AccountTreeModel = self.model()
         if model is None:
-            return
+            return False
+
+        # Always normalize to column 0 so drawRow comparison works
+        col0 = model.index(target_index.row(), 0, target_index.parent())
 
         # Get dragged IDs for validation
-        dragged_indexes = self.selectedIndexes()
         dragged_ids = set()
-        for idx in dragged_indexes:
+        for idx in self.selectedIndexes():
             if idx.column() == 0:
                 node = model.get_node(idx)
                 if node and node.account:
                     dragged_ids.add(node.account.id)
 
-        # Get target account ID
-        target_node = model.get_node(target_index)
-        target_id = target_node.account.id if (target_node and target_node.account) else None
-
         # Check if drop is valid (no cycles)
-        is_valid_drop = True
-        if target_id is not None:
-            for moved_id in dragged_ids:
-                if self._would_create_cycle(moved_id, target_id, model):
-                    is_valid_drop = False
-                    break
+        target_node = model.get_node(col0)
+        target_id = target_node.account.id if (target_node and target_node.account) else None
+        is_valid = all(
+            not self._would_create_cycle(mid, target_id, model)
+            for mid in dragged_ids
+        )
 
-        # Update current target and repaint
-        if self._current_drop_target != target_index:
+        # Repaint old and new target rows
+        if self._current_drop_target != col0:
             if self._current_drop_target is not None:
                 self.viewport().update(self.visualRect(self._current_drop_target))
-            self._current_drop_target = target_index
-            self.viewport().update(self.visualRect(target_index))
+            self._current_drop_target = col0
+            self.viewport().update(self.visualRect(col0))
+        elif self._current_drop_valid != is_valid:
+            # Same row but validity changed — repaint to update color
+            self.viewport().update(self.visualRect(col0))
 
-        # Set cursor based on validity
-        if is_valid_drop:
-            self.setCursor(QCursor(Qt.CursorShape.ClosedHandCursor))
-        else:
-            self.setCursor(QCursor(Qt.CursorShape.ForbiddenCursor))
+        self._current_drop_valid = is_valid
+        return is_valid
 
     def _clear_drop_target(self):
-        """Clear the drop target highlight and restore cursor."""
-        self.unsetCursor()
+        """Clear the drop target highlight."""
         if self._current_drop_target is not None:
             self.viewport().update(self.visualRect(self._current_drop_target))
         self._current_drop_target = None
+        self._current_drop_valid = True
 
     def startDrag(self, supported_actions):
         """Create a custom drag pixmap showing what's being dragged."""
@@ -411,36 +414,28 @@ class AccountTreeView(QTreeView):
             super().startDrag(supported_actions)
             return
 
-        # Create pixmap with text
+        # Build pixmap via QImage so we get a proper ARGB32 surface
         font = QFont()
         font.setPointSize(11)
         font.setBold(True)
 
-        # Use fontMetrics from tree to get accurate size
-        fm = self.fontMetrics()
-        text_width = fm.horizontalAdvance(text) + 24
-        text_height = fm.height() + 12
+        from PyQt6.QtGui import QFontMetrics
+        fm = QFontMetrics(font)
+        text_width = max(fm.horizontalAdvance(text) + 24, 60)
+        text_height = max(fm.height() + 12, 30)
 
-        # Ensure minimum size
-        text_width = max(text_width, 60)
-        text_height = max(text_height, 30)
+        image = QImage(text_width, text_height, QImage.Format.Format_ARGB32_Premultiplied)
+        image.fill(QColor(76, 175, 80, 220))  # semi-transparent green
 
-        # Create pixmap with proper size
-        pixmap = QPixmap(text_width, text_height)
-        pixmap.fill(QColor(76, 175, 80, 230))  # Green background
-
-        # Paint on pixmap
-        painter = QPainter(pixmap)
+        painter = QPainter(image)
         painter.setFont(font)
-
-        # Draw dark green border
         painter.setPen(QPen(QColor(27, 94, 32), 2))
         painter.drawRect(0, 0, text_width - 1, text_height - 1)
-
-        # Draw white text
         painter.setPen(QColor(255, 255, 255))
-        painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, text)
+        painter.drawText(image.rect(), Qt.AlignmentFlag.AlignCenter, text)
         painter.end()
+
+        pixmap = QPixmap.fromImage(image)
 
         # Create and execute drag
         drag = QDrag(self)
@@ -469,41 +464,17 @@ class AccountTreeView(QTreeView):
 
     def drawRow(self, painter: QPainter, option, index: QModelIndex):
         """Override drawRow to highlight drop target."""
-        # Draw the normal row first
         super().drawRow(painter, option, index)
 
-        # If this is the current drop target, draw visual feedback
-        if self._drag_in_progress and self._current_drop_target is not None:
-            if index == self._current_drop_target:
-                model: AccountTreeModel = self.model()
-                if model is None:
-                    return
+        if not self._drag_in_progress or self._current_drop_target is None:
+            return
 
-                # Determine if this is a valid drop target
-                dragged_indexes = self.selectedIndexes()
-                dragged_ids = set()
-                for idx in dragged_indexes:
-                    if idx.column() == 0:
-                        node = model.get_node(idx)
-                        if node and node.account:
-                            dragged_ids.add(node.account.id)
-
-                target_node = model.get_node(index)
-                target_id = target_node.account.id if (target_node and target_node.account) else None
-
-                is_valid_drop = True
-                if target_id is not None:
-                    for moved_id in dragged_ids:
-                        if self._would_create_cycle(moved_id, target_id, model):
-                            is_valid_drop = False
-                            break
-
-                # Draw highlight background
-                painter.save()
-                if is_valid_drop:
-                    # Bright green for valid drop
-                    painter.fillRect(option.rect, QBrush(QColor(102, 187, 106, 180)))
-                else:
-                    # Bright red for invalid drop
-                    painter.fillRect(option.rect, QBrush(QColor(239, 83, 80, 180)))
-                painter.restore()
+        # _current_drop_target is always column 0; compare row+parent only
+        if (index.row() == self._current_drop_target.row()
+                and index.parent() == self._current_drop_target.parent()):
+            painter.save()
+            if self._current_drop_valid:
+                painter.fillRect(option.rect, QBrush(QColor(102, 187, 106, 180)))
+            else:
+                painter.fillRect(option.rect, QBrush(QColor(239, 83, 80, 180)))
+            painter.restore()
