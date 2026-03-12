@@ -1,7 +1,7 @@
 """Account tree view with context menu and drag-and-drop."""
 from PyQt6.QtCore import QItemSelectionModel, QMimeData, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import (
-    QAction, QBrush, QColor, QCursor, QDrag, QFont, QPainter, QPen, QPixmap
+    QAction, QColor, QCursor, QDrag, QFont, QPainter, QPen, QPixmap
 )
 from PyQt6.QtWidgets import QAbstractItemView, QApplication, QMenu, QTreeView
 
@@ -371,13 +371,13 @@ class AccountTreeView(QTreeView):
 
         # Set cursor based on validity
         if is_valid_drop:
-            QApplication.setOverrideCursor(QCursor(Qt.CursorShape.OpenHandCursor))
+            self.setCursor(QCursor(Qt.CursorShape.OpenHandCursor))
         else:
-            QApplication.setOverrideCursor(QCursor(Qt.CursorShape.ForbiddenCursor))
+            self.setCursor(QCursor(Qt.CursorShape.ForbiddenCursor))
 
     def _clear_drop_target(self):
         """Clear the drop target highlight and restore cursor."""
-        QApplication.restoreOverrideCursor()
+        self.unsetCursor()
 
         if self._current_drop_target is not None and self._current_drop_target.isValid():
             model = self.model()
