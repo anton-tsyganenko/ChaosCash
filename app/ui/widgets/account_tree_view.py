@@ -383,6 +383,7 @@ class AccountTreeView(QTreeView):
         """Create a custom drag pixmap showing what's being dragged."""
         model: AccountTreeModel = self.model()
         if model is None:
+            super().startDrag(supported_actions)
             return
 
         # Get selected account names
@@ -395,6 +396,7 @@ class AccountTreeView(QTreeView):
                     account_names.append(node.account.name)
 
         if not account_names:
+            super().startDrag(supported_actions)
             return
 
         # Create a text representation
@@ -403,37 +405,47 @@ class AccountTreeView(QTreeView):
         else:
             text = f"{account_names[0]} (+{len(account_names) - 1})"
 
+        # Get MIME data first
+        mime = model.mimeData(selected_indexes)
+        if not mime:
+            super().startDrag(supported_actions)
+            return
+
         # Create pixmap with text
         font = QFont()
         font.setPointSize(11)
         font.setBold(True)
-        metrics = self.fontMetrics()
-        text_width = metrics.horizontalAdvance(text) + 24
-        text_height = metrics.height() + 12
 
+        # Use fontMetrics from tree to get accurate size
+        fm = self.fontMetrics()
+        text_width = fm.horizontalAdvance(text) + 24
+        text_height = fm.height() + 12
+
+        # Ensure minimum size
+        text_width = max(text_width, 60)
+        text_height = max(text_height, 30)
+
+        # Create pixmap with proper size
         pixmap = QPixmap(text_width, text_height)
-        pixmap.fill(Qt.GlobalColor.transparent)
+        pixmap.fill(QColor(76, 175, 80, 230))  # Green background
 
+        # Paint on pixmap
         painter = QPainter(pixmap)
         painter.setFont(font)
 
-        # Draw background with border
-        painter.fillRect(pixmap.rect(), QBrush(QColor(76, 175, 80, 230)))  # Material Green
-        painter.setPen(QPen(QColor(27, 94, 32, 255), 2))  # Dark green border
-        painter.drawRect(0, 0, pixmap.width() - 1, pixmap.height() - 1)
+        # Draw dark green border
+        painter.setPen(QPen(QColor(27, 94, 32), 2))
+        painter.drawRect(0, 0, text_width - 1, text_height - 1)
 
-        # Draw text
-        painter.setPen(QPen(QColor(255, 255, 255, 255)))  # White text
+        # Draw white text
+        painter.setPen(QColor(255, 255, 255))
         painter.drawText(pixmap.rect(), Qt.AlignmentFlag.AlignCenter, text)
         painter.end()
 
-        # Start drag with custom pixmap
+        # Create and execute drag
         drag = QDrag(self)
         drag.setPixmap(pixmap)
         drag.setHotSpot(pixmap.rect().center())
-
-        # Use existing MIME data from model
-        mime = model.mimeData(self.selectedIndexes())
         drag.setMimeData(mime)
 
         drag.exec(supported_actions)
