@@ -1,7 +1,7 @@
 """Account tree view with context menu and drag-and-drop."""
-from PyQt6.QtCore import QItemSelectionModel, QModelIndex, QPoint, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QDrag, QFontMetrics, QPainter, QPixmap
-from PyQt6.QtWidgets import QAbstractItemView, QMenu, QTreeView
+from PyQt6.QtCore import QItemSelectionModel, QModelIndex, QPoint, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QColor, QCursor, QDrag, QFontMetrics, QPainter, QPixmap
+from PyQt6.QtWidgets import QAbstractItemView, QApplication, QMenu, QTreeView
 
 from app.i18n import tr
 from app.repositories.account_repo import AccountRepo
@@ -103,7 +103,6 @@ class AccountTreeView(QTreeView):
         if acc is None:
             return
 
-        from PyQt6.QtWidgets import QApplication
         modifiers = QApplication.keyboardModifiers()
 
         if modifiers & Qt.KeyboardModifier.AltModifier:
@@ -263,6 +262,18 @@ class AccountTreeView(QTreeView):
             self._delete_all_descendants(child.id)
             self.account_repo.delete(child.id)
 
+    @staticmethod
+    def _render_cursor(shape: Qt.CursorShape) -> QPixmap:
+        """Render a cursor shape to a small pixmap for QDrag.setDragCursor."""
+        cursor = QCursor(shape)
+        pm = cursor.pixmap()
+        if not pm.isNull():
+            return pm
+        # Fallback: create a 1x1 transparent pixmap (uses system cursor)
+        fallback = QPixmap(1, 1)
+        fallback.fill(Qt.GlobalColor.transparent)
+        return fallback
+
     def startDrag(self, supportedActions):
         """Create a custom drag with account name preview and grabbing cursor."""
         model: AccountTreeModel = self.model()
@@ -284,17 +295,21 @@ class AccountTreeView(QTreeView):
         drag = QDrag(self)
         drag.setMimeData(mime)
 
+        # Build drag pixmap with account name label
         label = ", ".join(names)
         if len(label) > 40:
             label = label[:37] + "..."
         font = self.font()
+        dpr = self.devicePixelRatioF()
         fm = QFontMetrics(font)
         padding = 8
-        text_rect = fm.boundingRect(label)
-        w = text_rect.width() + padding * 2
-        h = text_rect.height() + padding * 2
+        text_w = fm.horizontalAdvance(label)
+        text_h = fm.height()
+        w = text_w + padding * 2
+        h = text_h + padding * 2
 
-        pixmap = QPixmap(w, h)
+        pixmap = QPixmap(int(w * dpr), int(h * dpr))
+        pixmap.setDevicePixelRatio(dpr)
         pixmap.fill(Qt.GlobalColor.transparent)
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -309,9 +324,11 @@ class AccountTreeView(QTreeView):
         drag.setPixmap(pixmap)
         drag.setHotSpot(QPoint(0, h // 2))
 
-        self.viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
+        # Set drag cursors: grabbing for valid targets, no-drop for invalid
+        drag.setDragCursor(self._render_cursor(Qt.CursorShape.ClosedHandCursor),
+                           Qt.DropAction.MoveAction)
+
         drag.exec(Qt.DropAction.MoveAction)
-        self.viewport().unsetCursor()
         self._dragged_ids = set()
         self._clear_drop_highlight()
 
@@ -360,15 +377,14 @@ class AccountTreeView(QTreeView):
             self.viewport().update()
 
         if valid:
-            self.viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
-            event.acceptProposedAction()
+            event.setDropAction(Qt.DropAction.MoveAction)
+            event.accept()
         else:
-            self.viewport().setCursor(Qt.CursorShape.ForbiddenCursor)
-            event.ignore()
+            event.setDropAction(Qt.DropAction.IgnoreAction)
+            event.accept()
 
     def dragLeaveEvent(self, event):
         self._clear_drop_highlight()
-        self.viewport().unsetCursor()
         super().dragLeaveEvent(event)
 
     def paintEvent(self, event):
@@ -389,7 +405,6 @@ class AccountTreeView(QTreeView):
     def dropEvent(self, event):
         """Handle DnD with cycle detection."""
         self._clear_drop_highlight()
-        self.viewport().unsetCursor()
 
         if not event.mimeData().hasFormat("application/x-chaoscash-account"):
             event.ignore()
