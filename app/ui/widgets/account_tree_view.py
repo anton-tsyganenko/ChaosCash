@@ -265,6 +265,10 @@ class AccountTreeView(QTreeView):
 
     def startDrag(self, supportedActions):
         """Create a custom drag with account name preview and grabbing cursor."""
+        import logging
+        log = logging.getLogger(__name__)
+        log.warning("[DnD] startDrag called, supportedActions=%s", supportedActions)
+
         model: AccountTreeModel = self.model()
         indexes = self.selectedIndexes()
         dragged_ids = set()
@@ -277,19 +281,29 @@ class AccountTreeView(QTreeView):
                     if first_name_index is None:
                         first_name_index = idx
         if not dragged_ids:
+            log.warning("[DnD] startDrag: no dragged_ids, returning early")
             return
 
+        log.warning("[DnD] startDrag: dragged_ids=%s", dragged_ids)
         self._dragged_ids = dragged_ids
         self._drag_active = True
 
         mime = model.mimeData(indexes)
+        log.warning("[DnD] mimeData formats=%s", mime.formats())
         drag = QDrag(self)
         drag.setMimeData(mime)
 
         # Grab the visual row of the first selected account as drag pixmap
         rect = self.visualRect(first_name_index)
+        log.warning("[DnD] visualRect=%s (x=%d, y=%d, w=%d, h=%d)",
+                    rect, rect.x(), rect.y(), rect.width(), rect.height())
         row_rect = QRect(0, rect.y(), self.viewport().width(), rect.height())
+        log.warning("[DnD] row_rect=%s, viewport size=%s",
+                    row_rect, self.viewport().size())
         pixmap = self.viewport().grab(row_rect)
+        log.warning("[DnD] grabbed pixmap: size=%s, isNull=%s",
+                    pixmap.size(), pixmap.isNull())
+
         # Add semi-transparency
         translucent = QPixmap(pixmap.size())
         translucent.fill(Qt.GlobalColor.transparent)
@@ -297,11 +311,17 @@ class AccountTreeView(QTreeView):
         painter.setOpacity(0.7)
         painter.drawPixmap(0, 0, pixmap)
         painter.end()
+        log.warning("[DnD] translucent pixmap: size=%s, isNull=%s",
+                    translucent.size(), translucent.isNull())
         drag.setPixmap(translucent)
         drag.setHotSpot(QPoint(rect.x(), rect.height() // 2))
+        log.warning("[DnD] hotSpot=%s", drag.hotSpot())
 
+        log.warning("[DnD] calling QApplication.setOverrideCursor(ClosedHandCursor)")
         QApplication.setOverrideCursor(Qt.CursorShape.ClosedHandCursor)
-        drag.exec(Qt.DropAction.MoveAction)
+        log.warning("[DnD] calling drag.exec(MoveAction)")
+        result = drag.exec(Qt.DropAction.MoveAction)
+        log.warning("[DnD] drag.exec returned: %s", result)
         QApplication.restoreOverrideCursor()
         self._drag_active = False
         self._dragged_ids = set()
@@ -330,18 +350,29 @@ class AccountTreeView(QTreeView):
             self.viewport().update()
 
     def dragEnterEvent(self, event):
-        if event.mimeData().hasFormat("application/x-chaoscash-account"):
+        import logging
+        log = logging.getLogger(__name__)
+        has_fmt = event.mimeData().hasFormat("application/x-chaoscash-account")
+        log.warning("[DnD] dragEnterEvent: hasFormat=%s, formats=%s",
+                    has_fmt, event.mimeData().formats())
+        if has_fmt:
             event.acceptProposedAction()
         else:
             event.ignore()
 
     def dragMoveEvent(self, event):
+        import logging
+        log = logging.getLogger(__name__)
         if not event.mimeData().hasFormat("application/x-chaoscash-account"):
+            log.warning("[DnD] dragMoveEvent: wrong format, ignoring")
             event.ignore()
             return
 
         index = self.indexAt(event.position().toPoint())
         valid = self._is_valid_drop_target(index)
+        log.warning("[DnD] dragMoveEvent: pos=%s, index.isValid=%s, valid=%s, _drag_active=%s",
+                    event.position().toPoint(), index.isValid(), valid,
+                    getattr(self, '_drag_active', 'N/A'))
 
         old_highlight = getattr(self, "_drop_highlight_index", None)
         if index.isValid() and valid:
@@ -361,6 +392,8 @@ class AccountTreeView(QTreeView):
             event.accept()
 
     def dragLeaveEvent(self, event):
+        import logging
+        logging.getLogger(__name__).warning("[DnD] dragLeaveEvent")
         self._clear_drop_highlight()
         super().dragLeaveEvent(event)
 
@@ -381,6 +414,9 @@ class AccountTreeView(QTreeView):
 
     def dropEvent(self, event):
         """Handle DnD with cycle detection."""
+        import logging
+        log = logging.getLogger(__name__)
+        log.warning("[DnD] dropEvent called")
         self._clear_drop_highlight()
 
         if not event.mimeData().hasFormat("application/x-chaoscash-account"):
