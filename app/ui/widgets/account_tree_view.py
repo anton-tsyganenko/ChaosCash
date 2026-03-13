@@ -1,6 +1,6 @@
 """Account tree view with context menu and drag-and-drop."""
-from PyQt6.QtCore import QItemSelectionModel, QModelIndex, Qt, pyqtSignal
-from PyQt6.QtGui import QAction
+from PyQt6.QtCore import QItemSelectionModel, QModelIndex, QPoint, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QColor, QDrag, QFontMetrics, QPainter, QPixmap
 from PyQt6.QtWidgets import QAbstractItemView, QMenu, QTreeView
 
 from app.i18n import tr
@@ -32,6 +32,9 @@ class AccountTreeView(QTreeView):
         self.split_repo = split_repo
         self.balance_service = balance_service
         self.settings = settings
+
+        self._dragged_ids: set[int] = set()
+        self._drop_highlight_index: QModelIndex | None = None
 
         self.setSelectionMode(QTreeView.SelectionMode.ExtendedSelection)
         self.setDragDropMode(QTreeView.DragDropMode.InternalMove)
@@ -260,6 +263,80 @@ class AccountTreeView(QTreeView):
             self._delete_all_descendants(child.id)
             self.account_repo.delete(child.id)
 
+    def startDrag(self, supportedActions):
+        """Create a custom drag with account name preview and grabbing cursor."""
+        model: AccountTreeModel = self.model()
+        indexes = self.selectedIndexes()
+        names = []
+        dragged_ids = set()
+        for idx in indexes:
+            if idx.column() == 0:
+                node = model.get_node(idx)
+                if node and node.account and not node.is_virtual:
+                    names.append(node.account.name)
+                    dragged_ids.add(node.account.id)
+        if not names:
+            return
+
+        self._dragged_ids = dragged_ids
+
+        mime = model.mimeData(indexes)
+        drag = QDrag(self)
+        drag.setMimeData(mime)
+
+        label = ", ".join(names)
+        if len(label) > 40:
+            label = label[:37] + "..."
+        font = self.font()
+        fm = QFontMetrics(font)
+        padding = 8
+        text_rect = fm.boundingRect(label)
+        w = text_rect.width() + padding * 2
+        h = text_rect.height() + padding * 2
+
+        pixmap = QPixmap(w, h)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setBrush(QColor(240, 240, 240, 220))
+        painter.setPen(QColor(180, 180, 180))
+        painter.drawRoundedRect(0, 0, w - 1, h - 1, 4, 4)
+        painter.setPen(QColor(60, 60, 60))
+        painter.setFont(font)
+        painter.drawText(padding, padding + fm.ascent(), label)
+        painter.end()
+
+        drag.setPixmap(pixmap)
+        drag.setHotSpot(QPoint(0, h // 2))
+
+        self.viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
+        drag.exec(Qt.DropAction.MoveAction)
+        self.viewport().unsetCursor()
+        self._dragged_ids = set()
+        self._clear_drop_highlight()
+
+    def _is_valid_drop_target(self, index: QModelIndex) -> bool:
+        """Check if dropping onto index would be valid for all dragged items."""
+        model: AccountTreeModel = self.model()
+        if index.isValid():
+            target_node = model.get_node(index)
+            if target_node and target_node.is_virtual:
+                return False
+            target_id = target_node.account.id if (target_node and target_node.account) else None
+        else:
+            target_id = None
+
+        for moved_id in self._dragged_ids:
+            if self._would_create_cycle(moved_id, target_id, model):
+                return False
+        return True
+
+    def _clear_drop_highlight(self):
+        """Remove drop highlight from previously highlighted item."""
+        if hasattr(self, "_drop_highlight_index") and self._drop_highlight_index is not None:
+            self._drop_highlight_index = None
+            self.viewport().update()
+
     def dragEnterEvent(self, event):
         if event.mimeData().hasFormat("application/x-chaoscash-account"):
             event.acceptProposedAction()
@@ -267,26 +344,67 @@ class AccountTreeView(QTreeView):
             event.ignore()
 
     def dragMoveEvent(self, event):
-        if event.mimeData().hasFormat("application/x-chaoscash-account"):
+        if not event.mimeData().hasFormat("application/x-chaoscash-account"):
+            event.ignore()
+            return
+
+        index = self.indexAt(event.position().toPoint())
+        valid = self._is_valid_drop_target(index)
+
+        old_highlight = getattr(self, "_drop_highlight_index", None)
+        if index.isValid() and valid:
+            self._drop_highlight_index = index
+        else:
+            self._drop_highlight_index = None
+        if old_highlight != self._drop_highlight_index:
+            self.viewport().update()
+
+        if valid:
+            self.viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
             event.acceptProposedAction()
         else:
+            self.viewport().setCursor(Qt.CursorShape.ForbiddenCursor)
             event.ignore()
+
+    def dragLeaveEvent(self, event):
+        self._clear_drop_highlight()
+        self.viewport().unsetCursor()
+        super().dragLeaveEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+        highlight = getattr(self, "_drop_highlight_index", None)
+        if highlight is not None and highlight.isValid():
+            rect = self.visualRect(highlight)
+            if not rect.isNull():
+                # Draw highlight across the full row width
+                rect.setLeft(0)
+                rect.setWidth(self.viewport().width())
+                painter = QPainter(self.viewport())
+                painter.setPen(QColor(41, 128, 185))
+                painter.setBrush(QColor(41, 128, 185, 40))
+                painter.drawRect(rect.adjusted(0, 0, -1, -1))
+                painter.end()
 
     def dropEvent(self, event):
         """Handle DnD with cycle detection."""
+        self._clear_drop_highlight()
+        self.viewport().unsetCursor()
+
         if not event.mimeData().hasFormat("application/x-chaoscash-account"):
             event.ignore()
             return
         target_index = self.indexAt(event.position().toPoint())
         model: AccountTreeModel = self.model()
 
-        dragged_indexes = self.selectedIndexes()
-        dragged_ids = set()
-        for idx in dragged_indexes:
-            if idx.column() == 0:
-                node = model.get_node(idx)
-                if node and node.account:
-                    dragged_ids.add(node.account.id)
+        dragged_ids = getattr(self, "_dragged_ids", set())
+        if not dragged_ids:
+            dragged_indexes = self.selectedIndexes()
+            for idx in dragged_indexes:
+                if idx.column() == 0:
+                    node = model.get_node(idx)
+                    if node and node.account:
+                        dragged_ids.add(node.account.id)
 
         if target_index.isValid():
             target_node = model.get_node(target_index)
@@ -296,9 +414,6 @@ class AccountTreeView(QTreeView):
 
         for moved_id in dragged_ids:
             if self._would_create_cycle(moved_id, target_id, model):
-                from PyQt6.QtWidgets import QMessageBox
-                QMessageBox.warning(self, tr("Invalid Move"),
-                                    tr("Cannot move an account into itself or its descendants."))
                 event.ignore()
                 return
 
