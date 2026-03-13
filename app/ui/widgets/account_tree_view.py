@@ -1,6 +1,6 @@
 """Account tree view with context menu and drag-and-drop."""
-from PyQt6.QtCore import QItemSelectionModel, QModelIndex, QPoint, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QCursor, QDrag, QFontMetrics, QPainter, QPixmap
+from PyQt6.QtCore import QItemSelectionModel, QModelIndex, QPoint, QRect, Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QColor, QDrag, QPainter, QPixmap
 from PyQt6.QtWidgets import QAbstractItemView, QApplication, QMenu, QTreeView
 
 from app.i18n import tr
@@ -34,6 +34,7 @@ class AccountTreeView(QTreeView):
         self.settings = settings
 
         self._dragged_ids: set[int] = set()
+        self._drag_active = False
         self._drop_highlight_index: QModelIndex | None = None
 
         self.setSelectionMode(QTreeView.SelectionMode.ExtendedSelection)
@@ -262,73 +263,47 @@ class AccountTreeView(QTreeView):
             self._delete_all_descendants(child.id)
             self.account_repo.delete(child.id)
 
-    @staticmethod
-    def _render_cursor(shape: Qt.CursorShape) -> QPixmap:
-        """Render a cursor shape to a small pixmap for QDrag.setDragCursor."""
-        cursor = QCursor(shape)
-        pm = cursor.pixmap()
-        if not pm.isNull():
-            return pm
-        # Fallback: create a 1x1 transparent pixmap (uses system cursor)
-        fallback = QPixmap(1, 1)
-        fallback.fill(Qt.GlobalColor.transparent)
-        return fallback
-
     def startDrag(self, supportedActions):
         """Create a custom drag with account name preview and grabbing cursor."""
         model: AccountTreeModel = self.model()
         indexes = self.selectedIndexes()
-        names = []
         dragged_ids = set()
+        first_name_index = None
         for idx in indexes:
             if idx.column() == 0:
                 node = model.get_node(idx)
                 if node and node.account and not node.is_virtual:
-                    names.append(node.account.name)
                     dragged_ids.add(node.account.id)
-        if not names:
+                    if first_name_index is None:
+                        first_name_index = idx
+        if not dragged_ids:
             return
 
         self._dragged_ids = dragged_ids
+        self._drag_active = True
 
         mime = model.mimeData(indexes)
         drag = QDrag(self)
         drag.setMimeData(mime)
 
-        # Build drag pixmap with account name label
-        label = ", ".join(names)
-        if len(label) > 40:
-            label = label[:37] + "..."
-        font = self.font()
-        dpr = self.devicePixelRatioF()
-        fm = QFontMetrics(font)
-        padding = 8
-        text_w = fm.horizontalAdvance(label)
-        text_h = fm.height()
-        w = text_w + padding * 2
-        h = text_h + padding * 2
-
-        pixmap = QPixmap(int(w * dpr), int(h * dpr))
-        pixmap.setDevicePixelRatio(dpr)
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setBrush(QColor(240, 240, 240, 220))
-        painter.setPen(QColor(180, 180, 180))
-        painter.drawRoundedRect(0, 0, w - 1, h - 1, 4, 4)
-        painter.setPen(QColor(60, 60, 60))
-        painter.setFont(font)
-        painter.drawText(padding, padding + fm.ascent(), label)
+        # Grab the visual row of the first selected account as drag pixmap
+        rect = self.visualRect(first_name_index)
+        row_rect = QRect(0, rect.y(), self.viewport().width(), rect.height())
+        pixmap = self.viewport().grab(row_rect)
+        # Add semi-transparency
+        translucent = QPixmap(pixmap.size())
+        translucent.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(translucent)
+        painter.setOpacity(0.7)
+        painter.drawPixmap(0, 0, pixmap)
         painter.end()
+        drag.setPixmap(translucent)
+        drag.setHotSpot(QPoint(rect.x(), rect.height() // 2))
 
-        drag.setPixmap(pixmap)
-        drag.setHotSpot(QPoint(0, h // 2))
-
-        # Set drag cursors: grabbing for valid targets, no-drop for invalid
-        drag.setDragCursor(self._render_cursor(Qt.CursorShape.ClosedHandCursor),
-                           Qt.DropAction.MoveAction)
-
+        QApplication.setOverrideCursor(Qt.CursorShape.ClosedHandCursor)
         drag.exec(Qt.DropAction.MoveAction)
+        QApplication.restoreOverrideCursor()
+        self._drag_active = False
         self._dragged_ids = set()
         self._clear_drop_highlight()
 
@@ -377,9 +352,11 @@ class AccountTreeView(QTreeView):
             self.viewport().update()
 
         if valid:
+            QApplication.changeOverrideCursor(Qt.CursorShape.ClosedHandCursor)
             event.setDropAction(Qt.DropAction.MoveAction)
             event.accept()
         else:
+            QApplication.changeOverrideCursor(Qt.CursorShape.ForbiddenCursor)
             event.setDropAction(Qt.DropAction.IgnoreAction)
             event.accept()
 
