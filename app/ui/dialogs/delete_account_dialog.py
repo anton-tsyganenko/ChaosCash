@@ -74,7 +74,7 @@ class DeleteAccountDialog(QDialog):
         self.action_group = QButtonGroup(self)
 
         self.rb_hide = QRadioButton(tr("Hide (recommended for closed accounts)"))
-        self.rb_delete = QRadioButton(tr(f"Delete account {account_name}"))
+        self.rb_delete = QRadioButton(tr("Delete account") + " " + account_name)
 
         self.rb_hide.setChecked(True)
         self.action_group.addButton(self.rb_hide, 0)

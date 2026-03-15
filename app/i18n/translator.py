@@ -29,8 +29,11 @@ def tr(text: str, context: str = "ChaosCash") -> str:
 def load_translations(app: QCoreApplication) -> None:
     """Load translations based on system locale.
 
-    Loads Russian translation from JSON if system locale is ru_*.
-    Falls back to English (source language) otherwise.
+    Dynamically loads translations for any language by extracting the language code
+    from system locale and loading the corresponding JSON file from translations/.
+    Falls back to English (source language) if translation file doesn't exist.
+
+    Supports any language: ru.json, fr.json, de.json, etc.
 
     Args:
         app: QApplication instance (used for compatibility, not strictly needed for JSON)
@@ -40,21 +43,24 @@ def load_translations(app: QCoreApplication) -> None:
     # Get translations directory
     translations_dir = Path(__file__).parent.parent.parent / "translations"
 
-    # Detect system locale
+    # Detect system locale and extract language code
     system_locale = QLocale.system()
+    language = system_locale.language()
 
-    # Try to load Russian translation if locale matches
-    if system_locale.language() == QLocale.Language.Russian:
-        json_file = translations_dir / "ru.json"
+    # Get language code (e.g., "ru" from Russian, "fr" from French)
+    # QLocale.Language has a name property that we can convert to lowercase
+    lang_code = language.name.lower() if hasattr(language, 'name') else 'en'
 
-        # Only load if file exists
-        if json_file.exists():
-            try:
-                with open(json_file, "r", encoding="utf-8") as f:
-                    _translations = json.load(f)
-                return
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Warning: Failed to load translations from {json_file}: {e}")
+    # Try to load translation file for detected language
+    json_file = translations_dir / f"{lang_code}.json"
+
+    if json_file.exists():
+        try:
+            with open(json_file, "r", encoding="utf-8") as f:
+                _translations = json.load(f)
+            return
+        except (json.JSONDecodeError, IOError) as e:
+            print(f"Warning: Failed to load translations from {json_file}: {e}")
 
     # Fallback: no translation loaded, use English source strings
     _translations = {}
