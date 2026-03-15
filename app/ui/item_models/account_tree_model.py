@@ -327,6 +327,45 @@ class AccountTreeModel(QAbstractItemModel):
         return mime
 
     def dropMimeData(self, data, action, row, col, parent) -> bool:
+        if action == Qt.DropAction.IgnoreAction:
+            return True
+        if not data.hasFormat("application/x-chaoscash-account"):
+            return False
+
+        raw = bytes(data.data("application/x-chaoscash-account")).decode()
+        moved_ids = [int(x) for x in raw.split(",") if x]
+        if not moved_ids:
+            return False
+
+        if parent.isValid():
+            target_node = self.get_node(parent)
+            if target_node is None or target_node.is_virtual:
+                return False
+            target_id = target_node.account.id if target_node.account else None
+        else:
+            target_id = None
+
+        for moved_id in moved_ids:
+            if self._would_create_cycle(moved_id, target_id):
+                return False
+
+        for moved_id in moved_ids:
+            self.account_repo.update_parent(moved_id, target_id)
+
+        self.balance_service.clear()
+        self.reload()
+        return True
+
+    def _would_create_cycle(self, moved_id: int, new_parent_id: int | None) -> bool:
+        if new_parent_id is None:
+            return False
+        if moved_id == new_parent_id:
+            return True
+        current = new_parent_id
+        while current is not None:
+            if current == moved_id:
+                return True
+            current = self.account_repo.get_parent_id(current)
         return False
 
     def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder) -> None:
