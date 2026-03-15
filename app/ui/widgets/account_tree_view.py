@@ -1,7 +1,7 @@
 """Account tree view with context menu and drag-and-drop."""
 from PyQt6.QtCore import QItemSelectionModel, QModelIndex, Qt, pyqtSignal
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QAbstractItemView, QMenu, QTreeView
+from PyQt6.QtWidgets import QAbstractItemView, QApplication, QMenu, QTreeView
 
 from app.i18n import tr
 from app.repositories.account_repo import AccountRepo
@@ -34,6 +34,9 @@ class AccountTreeView(QTreeView):
         self.settings = settings
 
         self.setSelectionMode(QTreeView.SelectionMode.ExtendedSelection)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
         self.setDragDropMode(QTreeView.DragDropMode.InternalMove)
         self.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -52,7 +55,7 @@ class AccountTreeView(QTreeView):
         super().setModel(model)
         if model is not None:
             self.selectionModel().selectionChanged.connect(self._on_selection_changed)
-
+            model.modelReset.connect(self.expandAll)
 
     def keyPressEvent(self, event):
         if self.state() == QAbstractItemView.State.EditingState:
@@ -100,7 +103,6 @@ class AccountTreeView(QTreeView):
         if acc is None:
             return
 
-        from PyQt6.QtWidgets import QApplication
         modifiers = QApplication.keyboardModifiers()
 
         if modifiers & Qt.KeyboardModifier.AltModifier:
@@ -155,7 +157,6 @@ class AccountTreeView(QTreeView):
         if selected_ids:
             self.account_selected.emit(selected_ids)
 
-
     def _show_header_menu(self, pos):
         show_column_visibility_menu(self, self.header(), pos)
 
@@ -190,7 +191,6 @@ class AccountTreeView(QTreeView):
         new_id = self.account_repo.insert(parent_id, tr("New Account"), None, None, None, False)
         self.balance_service.clear()
         model.reload()
-        self.expandAll()
 
         # Start inline rename on the newly created account
         new_index = model.get_index_for_account(new_id)
@@ -251,7 +251,6 @@ class AccountTreeView(QTreeView):
 
         self.balance_service.clear()
         model.reload()
-        self.expandAll()
 
     def _delete_all_descendants(self, account_id: int):
         """Recursively delete all descendants of an account."""
@@ -259,70 +258,6 @@ class AccountTreeView(QTreeView):
         for child in children:
             self._delete_all_descendants(child.id)
             self.account_repo.delete(child.id)
-
-    def dragEnterEvent(self, event):
-        if event.mimeData().hasFormat("application/x-chaoscash-account"):
-            event.acceptProposedAction()
-        else:
-            event.ignore()
-
-    def dragMoveEvent(self, event):
-        if event.mimeData().hasFormat("application/x-chaoscash-account"):
-            event.acceptProposedAction()
-        else:
-            event.ignore()
-
-    def dropEvent(self, event):
-        """Handle DnD with cycle detection."""
-        if not event.mimeData().hasFormat("application/x-chaoscash-account"):
-            event.ignore()
-            return
-        target_index = self.indexAt(event.position().toPoint())
-        model: AccountTreeModel = self.model()
-
-        dragged_indexes = self.selectedIndexes()
-        dragged_ids = set()
-        for idx in dragged_indexes:
-            if idx.column() == 0:
-                node = model.get_node(idx)
-                if node and node.account:
-                    dragged_ids.add(node.account.id)
-
-        if target_index.isValid():
-            target_node = model.get_node(target_index)
-            target_id = target_node.account.id if (target_node and target_node.account) else None
-        else:
-            target_id = None
-
-        for moved_id in dragged_ids:
-            if self._would_create_cycle(moved_id, target_id, model):
-                from PyQt6.QtWidgets import QMessageBox
-                QMessageBox.warning(self, tr("Invalid Move"),
-                                    tr("Cannot move an account into itself or its descendants."))
-                event.ignore()
-                return
-
-        for moved_id in dragged_ids:
-            self.account_repo.update_parent(moved_id, target_id)
-
-        self.balance_service.clear()
-        model.reload()
-        self.expandAll()
-        event.accept()
-
-    def _would_create_cycle(self, moved_id: int, new_parent_id: int | None,
-                             model: AccountTreeModel) -> bool:
-        if new_parent_id is None:
-            return False
-        if moved_id == new_parent_id:
-            return True
-        current = new_parent_id
-        while current is not None:
-            if current == moved_id:
-                return True
-            current = self.account_repo.get_parent_id(current)
-        return False
-
 
     def _toggle_column(self, col: int, checked: bool):
         set_column_visibility(self, col, checked)
