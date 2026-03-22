@@ -3,7 +3,7 @@ import logging
 
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtWidgets import QLineEdit, QStyledItemDelegate, QToolTip
-
+from app.i18n import tr
 from app.utils.expression_parser import safe_eval
 
 
@@ -53,7 +53,7 @@ class AmountDelegate(QStyledItemDelegate):
                     except ValueError:
                         QToolTip.showText(
                             editor.mapToGlobal(editor.rect().bottomLeft()),
-                            "Ошибка: неверное выражение",
+                            tr("Error: invalid expression"),
                             editor,
                         )
                         return True  # consume event — editor stays open

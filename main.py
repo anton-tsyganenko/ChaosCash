@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from PyQt6.QtWidgets import QApplication
 
+from app.i18n import tr
 from app.settings.app_settings import AppSettings
 from app.ui.main_window import MainWindow
 from app.ui.ui_event_logger import UIEventLogger
@@ -56,6 +57,9 @@ def main():
     app.setApplicationName("chaoscash")
     app.setApplicationDisplayName("ChaosCash")
 
+    from app.i18n.translator import load_translations
+    load_translations(app)
+
     settings = AppSettings()
 
     if args.debug_logging:
@@ -96,14 +100,14 @@ def _ask_file_path() -> str | None:
     class StartupDialog(QDialog):
         def __init__(self):
             super().__init__()
-            self.setWindowTitle("ChaosCash")
+            self.setWindowTitle(tr("ChaosCash"))
             self.path = None
             layout = QVBoxLayout(self)
-            layout.addWidget(QLabel("Welcome to ChaosCash\n\nOpen an existing database or create a new one."))
+            layout.addWidget(QLabel(tr("Welcome to ChaosCash\n\nOpen an existing database or create a new one.")))
             btn_layout = QHBoxLayout()
-            btn_open = QPushButton("Open existing...")
-            btn_new = QPushButton("Create new...")
-            btn_cancel = QPushButton("Cancel")
+            btn_open = QPushButton(tr("Open existing..."))
+            btn_new = QPushButton(tr("Create new..."))
+            btn_cancel = QPushButton(tr("Cancel"))
             btn_open.clicked.connect(self._open)
             btn_new.clicked.connect(self._new)
             btn_cancel.clicked.connect(self.reject)
@@ -114,8 +118,8 @@ def _ask_file_path() -> str | None:
 
         def _open(self):
             path, _ = QFileDialog.getOpenFileName(
-                self, "Open Database", "",
-                "ChaosCash Database (*.ccash *.db);;All Files (*)"
+                self, tr("Open Database"), "",
+                tr("ChaosCash Database (*.ccash *.db);;All Files (*)")
             )
             if path:
                 self.path = path
@@ -123,8 +127,8 @@ def _ask_file_path() -> str | None:
 
         def _new(self):
             path, _ = QFileDialog.getSaveFileName(
-                self, "New Database", "",
-                "ChaosCash Database (*.ccash *.db);;All Files (*)"
+                self, tr("New Database"), "",
+                tr("ChaosCash Database (*.ccash *.db);;All Files (*)")
             )
             if path:
                 self.path = path
