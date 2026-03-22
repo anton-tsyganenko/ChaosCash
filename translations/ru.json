@@ -82,5 +82,6 @@
   "Move splits to:": "Переместить сплиты в:",
   "Delete all splits (can create imbalance)": "Удалить все сплиты (может создать дисбаланс)",
   "Delete all transactions (can affect balance on other accounts)": "Удалить все транзакции (может повлиять на баланс на других счётах)",
-  "Delete account": "Удалить счёт"
+  "Delete account": "Удалить счёт",
+  "Error: invalid expression": "Ошибка: неверное выражение"
 }
