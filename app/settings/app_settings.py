@@ -1,4 +1,6 @@
 """Application settings stored in QSettings."""
+from pathlib import Path
+
 from PyQt6.QtCore import QSettings
 
 _ORG = "chaoscash"
@@ -12,6 +14,7 @@ _DEFAULTS = {
     "show_hidden_accounts": False,
     "allow_grouping_accounts_for_splits": False,
     "transaction_view_mode": "detailed",  # detailed | aggregated
+    "reports_output_dir": str(Path.home() / "ChaosCash_reports"),
 }
 
 
@@ -69,3 +72,11 @@ class AppSettings:
     @transaction_view_mode.setter
     def transaction_view_mode(self, value: str) -> None:
         self.set("transaction_view_mode", value)
+
+    @property
+    def reports_output_dir(self) -> str:
+        return str(self.get("reports_output_dir"))
+
+    @reports_output_dir.setter
+    def reports_output_dir(self, value: str) -> None:
+        self.set("reports_output_dir", value)

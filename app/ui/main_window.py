@@ -22,11 +22,15 @@ from app.database.schema import ensure_schema
 from app.i18n import tr
 from app.repositories.account_repo import AccountRepo
 from app.repositories.currency_repo import CurrencyRepo
+from app.repositories.price_repo import PriceRepo
 from app.repositories.split_repo import SplitRepo
 from app.repositories.transaction_repo import TransactionRepo
+from app.reports.contracts import ReportContext
+from app.reports.manager import ReportManager
 from app.services.amount_formatter import AmountFormatter
 from app.services.balance_service import BalanceService
 from app.services.integrity_service import IntegrityService
+from app.services.price_service import PriceService
 from app.services.transaction_service import TransactionService
 from app.settings.app_settings import AppSettings
 from app.settings.display_settings import DisplaySettings
@@ -57,6 +61,7 @@ from app.ui.item_models.transaction_model import TransactionModel
 from app.ui.widgets.account_tree_view import AccountTreeView
 from app.ui.widgets.split_view import SplitView
 from app.ui.widgets.transaction_view import TransactionView
+from app.ui.widgets.view_helpers import apply_account_tree_display_settings, apply_display_settings
 from app.utils.amount_math import float_to_quants
 from app.utils.expression_parser import safe_eval
 from app.utils.recent_files import add_recent_file, get_recent_files
@@ -77,12 +82,14 @@ class MainWindow(QMainWindow):
         self.trans_repo = TransactionRepo(self._conn)
         self.split_repo = SplitRepo(self._conn)
         self.currency_repo = CurrencyRepo(self._conn)
+        self.price_repo = PriceRepo(self._conn)
 
         # Services
         self.balance_service = BalanceService(self.account_repo)
         self.trans_service = TransactionService(self.trans_repo, self.split_repo)
         self.integrity_service = IntegrityService(self.trans_repo, self.split_repo, self._conn)
         self.amount_formatter = AmountFormatter(self.settings, self.currency_repo)
+        self.price_service = PriceService(self.price_repo)
 
         # State
         self._selected_account_ids: list[int] = []
@@ -97,6 +104,23 @@ class MainWindow(QMainWindow):
         self._acc_display = DisplaySettings("accounts")
         self._trans_display = DisplaySettings("transactions")
         self._split_display = DisplaySettings("splits")
+
+        # Reports
+        self.report_manager = ReportManager(
+            ReportContext(
+                account_repo=self.account_repo,
+                transaction_repo=self.trans_repo,
+                split_repo=self.split_repo,
+                currency_repo=self.currency_repo,
+                price_repo=self.price_repo,
+                balance_service=self.balance_service,
+                integrity_service=self.integrity_service,
+                price_service=self.price_service,
+                amount_formatter=self.amount_formatter,
+                settings=self.settings,
+            ),
+            parent=self,
+        )
 
         self._setup_ui()
 
@@ -255,6 +279,19 @@ class MainWindow(QMainWindow):
         settings_action.triggered.connect(self._open_settings)
         tools_menu.addAction(settings_action)
 
+        # Reports menu
+        self.reports_menu = menubar.addMenu(tr("&Reports"))
+        self._refresh_reports_menu()
+
+    def _refresh_reports_menu(self):
+        self.reports_menu.clear()
+        for definition in self.report_manager.list_definitions():
+            action = QAction(tr(definition.title), self)
+            action.triggered.connect(
+                lambda checked=False, rid=definition.id: self._run_report(rid)
+            )
+            self.reports_menu.addAction(action)
+
     def _setup_models(self):
         # Account tree model
         self.account_model = AccountTreeModel(
@@ -313,6 +350,12 @@ class MainWindow(QMainWindow):
         sh.resizeSection(COL_CURRENCY, 70)
 
         self._restore_view_settings()
+        self.account_tree.display_change_callback = self._persist_account_display_settings
+        hdr.sectionMoved.connect(lambda *_: self._persist_account_display_settings())
+        hdr.sectionResized.connect(lambda *_: self._persist_account_display_settings())
+        hdr.sortIndicatorChanged.connect(lambda *_: self._persist_account_display_settings())
+        if hasattr(hdr, "sectionHiddenChanged"):
+            hdr.sectionHiddenChanged.connect(lambda *_: self._persist_account_display_settings())
 
     def _setup_delegates(self):
         # Transaction view delegates
@@ -419,14 +462,7 @@ class MainWindow(QMainWindow):
             self.right_splitter.setSizes([int(x) for x in right_sizes])
 
     def _restore_view_settings(self):
-        self._apply_display_settings(
-            self.account_tree, self.account_tree.header(), self._acc_display,
-            default_order=list(range(self.account_model.columnCount())),
-            default_widths={0: 220, 1: 130, 2: 130, 3: 60, 4: 90, 5: 120, 6: 220},
-            default_hidden=[2, 3, 4, 5, 6],  # Hide: Own Balance, Hidden, Code, External ID, Description
-            default_sort_col=0,
-            default_sort_order=Qt.SortOrder.AscendingOrder,
-        )
+        apply_account_tree_display_settings(self.account_tree, self.account_tree.header(), self._acc_display)
         self._apply_display_settings(
             self.transaction_view, self.transaction_view.horizontalHeader(), self._trans_display,
             default_order=list(range(self.trans_model.columnCount())),
@@ -448,35 +484,16 @@ class MainWindow(QMainWindow):
                                 default_order: list[int], default_widths: dict[int, int],
                                 default_hidden: list[int], default_sort_col: int,
                                 default_sort_order: Qt.SortOrder):
-        model = view.model()
-        if model is None:
-            return
-        col_count = model.columnCount()
-
-        order = display.get_column_order(default_order)
-        if sorted(order) == list(range(col_count)):
-            for visual_pos, logical in enumerate(order):
-                current = header.visualIndex(logical)
-                if current != visual_pos:
-                    header.moveSection(current, visual_pos)
-
-        hidden = [c for c in display.get_hidden_columns(default_hidden) if 0 <= c < col_count]
-        if len(hidden) >= col_count:
-            hidden = hidden[:-1]
-        for c in range(col_count):
-            view.setColumnHidden(c, c in hidden)
-
-        widths = display.get_column_widths(default_widths)
-        for col, width in widths.items():
-            if 0 <= col < col_count and width > 20:
-                header.resizeSection(col, width)
-
-        sort_col = display.get_sort_column(default_sort_col)
-        default_sort_value = int(default_sort_order.value)
-        sort_order = Qt.SortOrder(display.get_sort_order(default_sort_value))
-        if 0 <= sort_col < col_count:
-            view.sortByColumn(sort_col, sort_order)
-            header.setSortIndicator(sort_col, sort_order)
+        apply_display_settings(
+            view,
+            header,
+            display,
+            default_order=default_order,
+            default_widths=default_widths,
+            default_hidden=default_hidden,
+            default_sort_col=default_sort_col,
+            default_sort_order=default_sort_order,
+        )
 
     def _save_view_settings(self):
         self._store_display_settings(self.account_tree, self.account_tree.header(), self._acc_display)
@@ -497,6 +514,9 @@ class MainWindow(QMainWindow):
         display.set_column_widths(widths)
         display.set_sort_column(header.sortIndicatorSection())
         display.set_sort_order(int(header.sortIndicatorOrder().value))
+
+    def _persist_account_display_settings(self):
+        self._store_display_settings(self.account_tree, self.account_tree.header(), self._acc_display)
 
     def _save_window_layout(self):
         s = QSettings("chaoscash", "chaoscash")
@@ -929,6 +949,21 @@ class MainWindow(QMainWindow):
                 self.trans_model.load(self._selected_account_ids)
             if self._current_trans_id:
                 self.split_model.load(self._current_trans_id)
+
+    def _run_report(self, report_id: str):
+        try:
+            result = self.report_manager.run_report_interactive(report_id)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, tr("Report Error"), str(exc))
+            return
+        if result is None:
+            return
+        if result.warnings:
+            QMessageBox.information(
+                self,
+                tr("Report generated with warnings"),
+                "\n".join(result.warnings),
+            )
 
     def closeEvent(self, event):
         self._save_view_settings()
