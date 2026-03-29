@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import csv
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from pathlib import Path
 
 from app.reports.contracts import OutputWriterSpec, ReportContext
@@ -45,16 +45,8 @@ class AccountBalancesCsvReport:
         max_after = None
         sources = None
         if price_rules is not None:
-            max_before = (
-                timedelta(days=price_rules.max_delta_before_days)
-                if price_rules.max_delta_before_days is not None
-                else None
-            )
-            max_after = (
-                timedelta(days=price_rules.max_delta_after_days)
-                if price_rules.max_delta_after_days is not None
-                else None
-            )
+            max_before = price_rules.max_delta_before
+            max_after = price_rules.max_delta_after
             sources = price_rules.sources or None
 
         warnings: list[str] = []

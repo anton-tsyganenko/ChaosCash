@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Literal
 
 
@@ -40,8 +40,8 @@ class PeriodRange:
 @dataclass(frozen=True)
 class PriceRules:
     sources: list[str] = field(default_factory=list)
-    max_delta_before_days: int | None = None
-    max_delta_after_days: int | None = None
+    max_delta_before: timedelta | None = None
+    max_delta_after: timedelta | None = None
 
 
 @dataclass(frozen=True)

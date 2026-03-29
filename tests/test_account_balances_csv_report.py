@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -59,7 +60,11 @@ def test_account_balances_csv_report_converts_to_report_currency(tmp_path: Path)
     params = ReportParams(values={
         "accounts": [1],
         "report_currency": 1,
-        "price_rules": PriceRules(sources=["manual"], max_delta_before_days=30, max_delta_after_days=1),
+        "price_rules": PriceRules(
+            sources=["manual"],
+            max_delta_before=timedelta(days=30),
+            max_delta_after=timedelta(hours=12),
+        ),
     })
 
     warnings = report.generate_to_file(params=params, context=FakeContext(), output_path=output)

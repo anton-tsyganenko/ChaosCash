@@ -1,7 +1,7 @@
 """Generic report parameter dialog built from schema fields."""
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import timedelta, timezone
 
 from PyQt6.QtCore import QDateTime, Qt
 from PyQt6.QtWidgets import (
@@ -162,17 +162,31 @@ class ReportParameterDialog(QDialog):
             sources.setPlaceholderText(tr("source1,source2"))
             before = QSpinBox()
             before.setRange(0, 3650)
-            before.setValue(30)
+            before.setValue(15)
+            before_unit = QComboBox()
+            before_unit.addItem(tr("minutes"), "minutes")
+            before_unit.addItem(tr("hours"), "hours")
+            before_unit.addItem(tr("days"), "days")
+            before_unit.addItem(tr("weeks"), "weeks")
+            before_unit.setCurrentIndex(before_unit.findData("days"))
             after = QSpinBox()
             after.setRange(0, 3650)
-            after.setValue(3)
+            after.setValue(12)
+            after_unit = QComboBox()
+            after_unit.addItem(tr("minutes"), "minutes")
+            after_unit.addItem(tr("hours"), "hours")
+            after_unit.addItem(tr("days"), "days")
+            after_unit.addItem(tr("weeks"), "weeks")
+            after_unit.setCurrentIndex(after_unit.findData("hours"))
             lay.addWidget(QLabel(tr("Sources")))
             lay.addWidget(sources)
-            lay.addWidget(QLabel(tr("Before(d)")))
+            lay.addWidget(QLabel(tr("Before")))
             lay.addWidget(before)
-            lay.addWidget(QLabel(tr("After(d)")))
+            lay.addWidget(before_unit)
+            lay.addWidget(QLabel(tr("After")))
             lay.addWidget(after)
-            self._widgets[field.key] = (sources, before, after)
+            lay.addWidget(after_unit)
+            self._widgets[field.key] = (sources, before, before_unit, after, after_unit)
             return container
 
         if isinstance(field, CurrencyField):
@@ -221,12 +235,12 @@ class ReportParameterDialog(QDialog):
                 }
             elif isinstance(field, PriceRulesField):
                 assert isinstance(widget, tuple)
-                src, before, after = widget
+                src, before, before_unit, after, after_unit = widget
                 sources = [x.strip() for x in src.text().split(",") if x.strip()]
                 values[field.key] = PriceRules(
                     sources=sources,
-                    max_delta_before_days=before.value() or None,
-                    max_delta_after_days=after.value() or None,
+                    max_delta_before=self._build_timedelta(before.value(), before_unit.currentData()),
+                    max_delta_after=self._build_timedelta(after.value(), after_unit.currentData()),
                 )
             elif isinstance(field, CurrencyField):
                 assert isinstance(widget, QComboBox)
@@ -238,6 +252,18 @@ class ReportParameterDialog(QDialog):
                 values[field.key] = text_value
         values["__open_after_generation"] = self.open_after_generation.isChecked()
         return ReportParams(values=values)
+
+    @staticmethod
+    def _build_timedelta(value: int, unit: str) -> timedelta | None:
+        if value <= 0:
+            return None
+        if unit == "minutes":
+            return timedelta(minutes=value)
+        if unit == "hours":
+            return timedelta(hours=value)
+        if unit == "weeks":
+            return timedelta(weeks=value)
+        return timedelta(days=value)
 
 
 class _AccountSelectionTree(QWidget):
