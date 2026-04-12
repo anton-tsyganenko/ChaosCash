@@ -3,7 +3,7 @@ import sqlite3
 DDL = """
 CREATE TABLE IF NOT EXISTS Currency (
     ID          INTEGER PRIMARY KEY,
-    Code        TEXT NOT NULL UNIQUE,
+    Code        TEXT NOT NULL,
     Type        TEXT NOT NULL,
     Name        TEXT,
     Denominator INTEGER NOT NULL DEFAULT 100 CHECK (Denominator >= 1)

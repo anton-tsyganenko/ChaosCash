@@ -32,6 +32,7 @@ from app.services.balance_service import BalanceService
 from app.services.integrity_service import IntegrityService
 from app.services.price_service import PriceService
 from app.services.transaction_service import TransactionService
+from app.services.gnucash_import_service import import_gnucash_sqlite
 from app.settings.app_settings import AppSettings
 from app.settings.display_settings import DisplaySettings
 from app.ui.delegates.account_combo_delegate import AccountComboDelegate
@@ -221,6 +222,12 @@ class MainWindow(QMainWindow):
         self.recent_menu = QMenu(tr("Recent Files"), self)
         file_menu.addMenu(self.recent_menu)
         self._refresh_recent_menu()
+
+        file_menu.addSeparator()
+
+        import_gnucash_action = QAction(tr("Import from &GnuCash..."), self)
+        import_gnucash_action.triggered.connect(self._import_from_gnucash)
+        file_menu.addAction(import_gnucash_action)
 
         file_menu.addSeparator()
 
@@ -934,6 +941,38 @@ class MainWindow(QMainWindow):
                 return
         new_window = MainWindow(path, self.settings)
         new_window.show()
+
+    def _import_from_gnucash(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            tr("Import GnuCash SQLite Database"),
+            "",
+            tr("SQLite Database (*.db *.sqlite *.sqlite3 *.gnucash);;All Files (*)"),
+        )
+        if not path:
+            return
+
+        try:
+            import_gnucash_sqlite(path, self._conn)
+        except Exception as exc:
+            QMessageBox.critical(self, tr("GnuCash Import Error"), str(exc))
+            return
+
+        self.balance_service.clear()
+        self._selected_account_ids = []
+        self._current_trans_id = None
+        self._virtual_mode = None
+        self.account_model.reload()
+        self.account_tree.expandAll()
+        self.trans_model.load([])
+        self.split_model.load(None)
+        self._refresh_integrity()
+
+        QMessageBox.information(
+            self,
+            tr("Import completed"),
+            tr("GnuCash data was imported successfully."),
+        )
 
     def _open_currency_editor(self):
         dlg = CurrencyEditorDialog(self.currency_repo, self)

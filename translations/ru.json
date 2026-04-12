@@ -114,5 +114,11 @@
   "Report generated with warnings": "Отчёт сформирован с предупреждениями",
   "Reports": "Отчёты",
   "Reports output folder:": "Папка для отчётов:",
-  "Select Reports Output Folder": "Выберите папку для отчётов"
+  "Select Reports Output Folder": "Выберите папку для отчётов",
+  "Import from &GnuCash...": "Импорт из &GnuCash...",
+  "Import GnuCash SQLite Database": "Импорт базы GnuCash SQLite",
+  "SQLite Database (*.db *.sqlite *.sqlite3 *.gnucash);;All Files (*)": "База SQLite (*.db *.sqlite *.sqlite3 *.gnucash);;Все файлы (*)",
+  "GnuCash Import Error": "Ошибка импорта GnuCash",
+  "Import completed": "Импорт завершён",
+  "GnuCash data was imported successfully.": "Данные GnuCash успешно импортированы."
 }
