@@ -63,7 +63,7 @@ class ReportParameterDialog(QDialog):
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle(title)
+        self.setWindowTitle(tr(title))
         self.setModal(True)
         self.setMinimumWidth(520)
 

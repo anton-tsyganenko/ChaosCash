@@ -25,8 +25,11 @@ def load_translations(app: QCoreApplication) -> None:
     """Load translations based on system locale.
 
     Dynamically loads translations for any language by extracting the language code
-    from system locale and loading the corresponding JSON file from translations/.
-    Falls back to English (source language) if translation file doesn't exist.
+    from system locale and merging language JSON files from:
+    - translations/<lang>.json (base application strings)
+    - app/reports/plugins/**/<lang>.json (report module strings, one file per report folder)
+
+    Falls back to English (source language) for missing keys.
 
     Supports any language: ru.json, fr.json, de.json, etc.
 
@@ -46,13 +49,22 @@ def load_translations(app: QCoreApplication) -> None:
     locale_name = system_locale.bcp47Name()
     lang_code = locale_name.split('-')[0].lower()  # Get part before dash
 
-    # Try to load translation file for detected language
-    json_file = translations_dir / f"{lang_code}.json"
+    # Load base application translations and optional report module translations
+    base_json_file = translations_dir / f"{lang_code}.json"
+    report_plugins_dir = Path(__file__).parent.parent / "reports" / "plugins"
 
-    if json_file.exists():
-        with open(json_file, "r", encoding="utf-8") as f:
-            _translations = json.load(f)
-        return
+    merged: dict[str, str] = {}
+
+    if base_json_file.exists():
+        with open(base_json_file, "r", encoding="utf-8") as f:
+            merged.update(json.load(f))
+
+    # Scalable structure: one translation file per report folder.
+    # Example: app/reports/plugins/account_balances_csv/ru.json
+    if report_plugins_dir.exists():
+        for report_json_file in sorted(report_plugins_dir.rglob(f"{lang_code}.json")):
+            with open(report_json_file, "r", encoding="utf-8") as f:
+                merged.update(json.load(f))
 
     # Fallback: no translation loaded, use English source strings
-    _translations = {}
+    _translations = merged

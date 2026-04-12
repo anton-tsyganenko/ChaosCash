@@ -1,0 +1,11 @@
+{
+  "Account Balances in Report Currency (CSV)": "Балансы счетов в валюте отчёта (CSV)",
+  "Report currency": "Валюта отчёта",
+  "Price rules": "Правила цен",
+  "No accounts selected": "Не выбраны счета",
+  "Report currency is required": "Необходимо указать валюту отчёта",
+  "Report currency not found": "Валюта отчёта не найдена",
+  "Unknown currency {currency_id} for account '{account_path}'": "Неизвестная валюта {currency_id} для счёта '{account_path}'",
+  "No price from {source_code} to {target_code} for account '{account_path}'": "Нет цены из {source_code} в {target_code} для счёта '{account_path}'",
+  "Balance ({code})": "Баланс ({code})"
+}

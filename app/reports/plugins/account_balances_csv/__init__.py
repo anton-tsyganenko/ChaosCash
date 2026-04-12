@@ -5,6 +5,7 @@ import csv
 from datetime import datetime, timezone
 from pathlib import Path
 
+from app.i18n import tr
 from app.reports.contracts import OutputWriterSpec, ReportContext
 from app.reports.schemas import (
     AccountSetField,
@@ -17,13 +18,13 @@ from app.reports.schemas import (
 
 class AccountBalancesCsvReport:
     id = "balances.converted.csv"
-    title = "Account Balances in Report Currency (CSV)"
+    title = tr("Account Balances in Report Currency (CSV)")
 
     def parameter_schema(self) -> ReportParameterSchema:
         return ReportParameterSchema(fields=[
-            AccountSetField(key="accounts", label="Accounts"),
-            CurrencyField(key="report_currency", label="Report currency", required=True, allow_auto=False),
-            PriceRulesField(key="price_rules", label="Price rules", required=False),
+            AccountSetField(key="accounts", label=tr("Accounts")),
+            CurrencyField(key="report_currency", label=tr("Report currency"), required=True, allow_auto=False),
+            PriceRulesField(key="price_rules", label=tr("Price rules"), required=False),
         ])
 
     def output_writer(self) -> OutputWriterSpec:
@@ -32,13 +33,13 @@ class AccountBalancesCsvReport:
     def generate_to_file(self, params: ReportParams, context: ReportContext, output_path: Path) -> list[str]:
         selected_ids = set(params.get("accounts", []))
         if not selected_ids:
-            raise ValueError("No accounts selected")
+            raise ValueError(tr("No accounts selected"))
         report_currency_id = params.get("report_currency")
         if report_currency_id is None:
-            raise ValueError("Report currency is required")
+            raise ValueError(tr("Report currency is required"))
         target_curr = context.currency_repo.get_by_id(report_currency_id)
         if target_curr is None:
-            raise ValueError("Report currency not found")
+            raise ValueError(tr("Report currency not found"))
 
         price_rules = params.get("price_rules")
         max_before = None
@@ -66,7 +67,7 @@ class AccountBalancesCsvReport:
 
                 source_curr = context.currency_repo.get_by_id(currency_id)
                 if source_curr is None:
-                    warnings.append(f"Unknown currency {currency_id} for account '{account_path}'")
+                    warnings.append(tr("Unknown currency {currency_id} for account '{account_path}'").format(currency_id=currency_id, account_path=account_path))
                     continue
                 source_amount = quants / source_curr.denominator
                 price_result = context.price_service.get_price(
@@ -79,7 +80,11 @@ class AccountBalancesCsvReport:
                 )
                 if price_result is None:
                     warnings.append(
-                        f"No price from {source_curr.code} to {target_curr.code} for account '{account_path}'"
+                        tr("No price from {source_code} to {target_code} for account '{account_path}'").format(
+                            source_code=source_curr.code,
+                            target_code=target_curr.code,
+                            account_path=account_path,
+                        )
                     )
                     continue
                 converted_amount = source_amount * price_result.value
@@ -89,7 +94,7 @@ class AccountBalancesCsvReport:
 
         with output_path.open("w", encoding="utf-8", newline="") as f:
             writer = csv.writer(f)
-            writer.writerow(["Account", f"Balance ({target_curr.code})"])
+            writer.writerow([tr("Account"), tr("Balance ({code})").format(code=target_curr.code)])
             writer.writerows(rows)
 
         return warnings
