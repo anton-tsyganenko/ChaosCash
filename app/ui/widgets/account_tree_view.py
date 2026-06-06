@@ -213,6 +213,8 @@ class AccountTreeView(QTreeView):
         if action == DeleteAccountDialog.HIDE:
             self.account_repo.update_hidden(acc.id, True)
         elif action == DeleteAccountDialog.DELETE:
+            descendants = self.account_repo.get_all_descendants(acc.id)
+
             # Handle sub-accounts
             if dlg.subaccounts_action == DeleteAccountDialog.MOVE_SUBACCOUNTS:
                 # Move direct children to target account
@@ -221,14 +223,11 @@ class AccountTreeView(QTreeView):
                     children = self.account_repo.get_children(acc.id)
                     for child in children:
                         self.account_repo.update_parent(child.id, target_id)
-            elif dlg.subaccounts_action == DeleteAccountDialog.DELETE_SUBACCOUNTS:
-                # Delete all sub-accounts recursively
-                self._delete_all_descendants(acc.id)
-
-            # Handle transactions - get list of accounts to process
+            # Handle transactions - get list of accounts to process.
+            # If sub-accounts are moved, only process the account being deleted.
+            # Descendants remain and keep their own splits/transactions.
             accounts_to_process = [acc.id]
-            if dlg.subaccounts_action != DeleteAccountDialog.DELETE_SUBACCOUNTS:
-                descendants = self.account_repo.get_all_descendants(acc.id)
+            if dlg.subaccounts_action == DeleteAccountDialog.DELETE_SUBACCOUNTS:
                 accounts_to_process.extend(descendants)
 
             if dlg.transactions_action == DeleteAccountDialog.MOVE_SPLITS:
@@ -245,6 +244,10 @@ class AccountTreeView(QTreeView):
                     trans_ids.update(self.account_repo.get_transaction_ids_for_account(acc_id))
                 for tid in trans_ids:
                     self.trans_repo.delete(tid)
+
+            if dlg.subaccounts_action == DeleteAccountDialog.DELETE_SUBACCOUNTS:
+                # Delete all sub-accounts recursively after dependent splits/trans are handled
+                self._delete_all_descendants(acc.id)
 
             # Delete the account
             self.account_repo.delete(acc.id)

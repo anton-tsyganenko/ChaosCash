@@ -120,7 +120,7 @@ class DeleteAccountDialog(QDialog):
 
         # Transactions section (only if splits exist)
         if self._has_splits:
-            transactions_group = QGroupBox(tr("Transactions (including sub-accounts)"))
+            transactions_group = QGroupBox(tr("Transactions from deleted accounts"))
             transactions_layout = QVBoxLayout(transactions_group)
             self.transactions_group = QButtonGroup(self)
 
@@ -185,6 +185,13 @@ class DeleteAccountDialog(QDialog):
                 return True
         return False
 
+    def _has_splits_for_accounts(self, account_ids: list[int]) -> bool:
+        """Check if any account in list has splits."""
+        for account_id in account_ids:
+            if self.split_repo.has_splits_for_account(account_id):
+                return True
+        return False
+
     def _populate_subaccounts_combo(self):
         """Populate sub-accounts dropdown with accounts to move to."""
         if self.subaccounts_combo is None:
@@ -194,11 +201,15 @@ class DeleteAccountDialog(QDialog):
         descendants = set(self.account_repo.get_all_descendants(self.exclude_id))
         descendants.add(self.exclude_id)
 
+        default_index = 0
+        self.subaccounts_combo.addItem(tr("No parent (top level)"), None)
+
         if self._parent_id is not None and self._parent_id not in descendants:
             parent_acc = self.account_repo.get_by_id(self._parent_id)
             if parent_acc:
                 path = self.account_repo.get_account_path(self._parent_id)
                 self.subaccounts_combo.addItem(path, self._parent_id)
+                default_index = self.subaccounts_combo.count() - 1
 
         excluded_ids = set(descendants)
         if self._parent_id is not None:
@@ -210,6 +221,9 @@ class DeleteAccountDialog(QDialog):
         )
         for path, account_id in items:
             self.subaccounts_combo.addItem(path, account_id)
+
+        if self.subaccounts_combo.count() > 0:
+            self.subaccounts_combo.setCurrentIndex(default_index)
 
     def _populate_transactions_combo(self):
         """Populate transactions dropdown with accounts to move splits to."""
@@ -247,6 +261,28 @@ class DeleteAccountDialog(QDialog):
     def _update_transactions_combo(self):
         """Update transactions dropdown when sub-accounts action changes."""
         self._populate_transactions_combo()
+        self._update_transactions_section_state()
+
+    def _deleted_accounts_for_current_choice(self) -> list[int]:
+        """Return account IDs that will be deleted with current sub-accounts choice."""
+        account_ids = [self.exclude_id]
+        if self.subaccounts_group is not None and self.rb_delete_recursive.isChecked():
+            account_ids.extend(self.account_repo.get_all_descendants(self.exclude_id))
+        return account_ids
+
+    def _update_transactions_section_state(self):
+        """Enable transactions section only when deleted accounts have splits."""
+        if self.transactions_group is None:
+            return
+
+        has_deleted_splits = self._has_splits_for_accounts(self._deleted_accounts_for_current_choice())
+        is_hide = self.rb_hide.isChecked()
+        section_enabled = (not is_hide) and has_deleted_splits
+
+        for button in self.transactions_group.buttons():
+            button.setEnabled(section_enabled)
+        if self.transactions_combo:
+            self.transactions_combo.setEnabled(section_enabled and self.rb_move_splits.isChecked())
 
     def _on_action_changed(self):
         """Handle action change to enable/disable sub-sections."""
@@ -259,11 +295,7 @@ class DeleteAccountDialog(QDialog):
             if self.subaccounts_combo:
                 self.subaccounts_combo.setEnabled(not is_hide and self.rb_move_subaccounts.isChecked())
 
-        if self.transactions_group is not None:
-            for button in self.transactions_group.buttons():
-                button.setEnabled(not is_hide)
-            if self.transactions_combo:
-                self.transactions_combo.setEnabled(not is_hide and self.rb_move_splits.isChecked())
+        self._update_transactions_section_state()
 
     def _accept(self):
         """Handle OK button click."""
