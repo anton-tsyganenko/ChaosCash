@@ -7,6 +7,7 @@ import sys
 # Ensure the project root is in the path
 sys.path.insert(0, os.path.dirname(__file__))
 
+from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QApplication
 
 from app.i18n import tr
@@ -53,6 +54,9 @@ def main():
     _configure_logging(args.debug_logging)
 
     app = QApplication(sys.argv)
+    app_font = QFont(app.font())
+    app_font.setFeature(QFont.Tag("tnum"), 1)
+    app.setFont(app_font)
     app.setOrganizationName("chaoscash")
     app.setApplicationName("chaoscash")
     app.setApplicationDisplayName("ChaosCash")
