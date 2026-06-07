@@ -1,7 +1,7 @@
 """Transaction table view with context menu."""
 import logging
 
-from PyQt6.QtCore import QModelIndex, Qt, pyqtSignal
+from PyQt6.QtCore import QModelIndex, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QAbstractItemDelegate,
@@ -49,6 +49,17 @@ class TransactionView(QTableView):
 
         self.setSortingEnabled(True)
         self.setObjectName("transaction_view")
+
+    def scroll_to_bottom(self):
+        """Scroll to the last real row (latest transactions)."""
+        model = self.model()
+        if model is None or model.rowCount() == 0:
+            self._logger.debug("scroll_to_bottom: no model or empty")
+            return
+        model.fetch_all()
+        self._logger.debug("scroll_to_bottom: row_count=%s has_phantom=%s",
+                           model.rowCount(), model.has_phantom_row())
+        QTimer.singleShot(0, self.scrollToBottom)
 
     def setModel(self, model):
         super().setModel(model)

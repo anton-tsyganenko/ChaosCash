@@ -108,6 +108,20 @@ class TransactionModel(QAbstractTableModel):
         self._rows.extend(self._all_rows[start:start + items_to_fetch])
         self.endInsertRows()
 
+    def fetch_all(self) -> None:
+        """Load all remaining rows at once, skipping lazy blocks."""
+        if not self.canFetchMore():
+            return
+        start = len(self._rows)
+        total = len(self._all_rows)
+        self.beginInsertRows(QModelIndex(), start, total - 1)
+        self._rows = list(self._all_rows)
+        self.endInsertRows()
+
+    def has_phantom_row(self) -> bool:
+        """Whether the model includes a phantom 'new transaction' row at the end."""
+        return bool(self._account_ids)
+
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.isValid():
             return 0
