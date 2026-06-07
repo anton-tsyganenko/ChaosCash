@@ -587,8 +587,7 @@ class MainWindow(QMainWindow):
                 # Transaction doesn't exist in new account set, clear selection
                 self._current_trans_id = None
         else:
-            # Show latest transactions (bottom) by default
-            self.transaction_view.scroll_to_bottom()
+            self.transaction_view.scrollToBottom()
 
     def _load_virtual_transactions(self, virtual_id: int):
         """Load transactions for virtual nodes (imbalance, empty)."""
@@ -611,8 +610,7 @@ class MainWindow(QMainWindow):
                 # Transaction doesn't exist in virtual node view, clear selection
                 self._current_trans_id = None
         else:
-            # Show latest transactions (bottom) by default
-            self.transaction_view.scroll_to_bottom()
+            self.transaction_view.scrollToBottom()
 
     def _on_transaction_cleared(self):
         self._new_trans_entry_mode = False

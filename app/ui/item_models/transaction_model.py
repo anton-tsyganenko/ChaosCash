@@ -15,7 +15,6 @@ from app.repositories.transaction_repo import TransactionRepo
 from app.utils.date_utils import qt_format_to_strftime
 
 UTC = timezone.utc
-FETCH_BLOCK = 500
 
 COL_ID = 0
 COL_SPLIT_ID = 1
@@ -37,7 +36,6 @@ class TransactionModel(QAbstractTableModel):
     """
     Displays transactions for selected accounts.
     Supports detailed (per-split) and aggregated (per-transaction) modes.
-    Implements canFetchMore/fetchMore for lazy loading.
     Last row is always a phantom (empty) row for entering new transactions.
     """
 
@@ -51,15 +49,13 @@ class TransactionModel(QAbstractTableModel):
         self.account_repo = account_repo
         self.settings = settings
         self._rows: list[dict] = []
-        self._all_rows: list[dict] = []
         self._account_ids: list[int] = []
         self._currencies: dict[int, object] = {}
         self._local_tz: TZInfo = datetime.now().astimezone().tzinfo
 
     def _load_rows(self, rows_data: list[dict], account_ids: list[int]) -> None:
         """Internal method to initialize row data after fetch. Called by load() and load_by_ids()."""
-        self._all_rows = rows_data
-        self._rows = rows_data[:FETCH_BLOCK]
+        self._rows = rows_data
         self._account_ids = account_ids
 
     def load(self, account_ids: list[int]) -> None:
@@ -96,27 +92,6 @@ class TransactionModel(QAbstractTableModel):
 
         self._load_rows(raw, [])  # no phantom row for virtual node views
         self.endResetModel()
-
-    def canFetchMore(self, parent: QModelIndex = QModelIndex()) -> bool:
-        return len(self._rows) < len(self._all_rows)
-
-    def fetchMore(self, parent: QModelIndex = QModelIndex()) -> None:
-        start = len(self._rows)
-        remainder = len(self._all_rows) - start
-        items_to_fetch = min(FETCH_BLOCK, remainder)
-        self.beginInsertRows(QModelIndex(), start, start + items_to_fetch - 1)
-        self._rows.extend(self._all_rows[start:start + items_to_fetch])
-        self.endInsertRows()
-
-    def fetch_all(self) -> None:
-        """Load all remaining rows at once, skipping lazy blocks."""
-        if not self.canFetchMore():
-            return
-        start = len(self._rows)
-        total = len(self._all_rows)
-        self.beginInsertRows(QModelIndex(), start, total - 1)
-        self._rows = list(self._all_rows)
-        self.endInsertRows()
 
     def has_phantom_row(self) -> bool:
         """Whether the model includes a phantom 'new transaction' row at the end."""
@@ -267,7 +242,7 @@ class TransactionModel(QAbstractTableModel):
 
                 # Keep all rows for the same transaction in sync (detailed mode has
                 # multiple rows per transaction).
-                for r in self._all_rows:
+                for r in self._rows:
                     if r.get("ID") == trans_id:
                         r["Date"] = new_date
 
@@ -282,7 +257,7 @@ class TransactionModel(QAbstractTableModel):
 
                 # Keep all rows for the same transaction in sync (applies to
                 # detailed and aggregated modes when one transaction spans rows).
-                for r in self._all_rows:
+                for r in self._rows:
                     if r.get("ID") == trans_id:
                         r["Description"] = new_desc
 
@@ -334,9 +309,7 @@ class TransactionModel(QAbstractTableModel):
             return 0
 
         self.layoutAboutToBeChanged.emit()
-        self._all_rows.sort(key=key, reverse=reverse)
-        loaded = len(self._rows)
-        self._rows = self._all_rows[:loaded]
+        self._rows.sort(key=key, reverse=reverse)
         self.layoutChanged.emit()
 
     def set_filter(self, filter_text: str = "") -> None:
