@@ -564,7 +564,6 @@ class MainWindow(QMainWindow):
         self._post_reload_focus = None
         self._selected_account_ids = account_ids
         self._virtual_mode = None
-        # Don't clear _current_trans_id — let _load_transactions restore it if it exists
         self._load_transactions()
 
     def _on_virtual_node_selected(self, virtual_id: int):
@@ -572,34 +571,20 @@ class MainWindow(QMainWindow):
         self._post_reload_focus = None
         self._selected_account_ids = []
         self._virtual_mode = virtual_id
-        # Don't clear _current_trans_id — let _load_virtual_transactions restore it if it exists
-        self._load_virtual_transactions(virtual_id)
+        self._load_transactions()
 
     def _load_transactions(self):
-        self.trans_model.load(self._selected_account_ids)
-        QApplication.processEvents()
-        self.split_model.load(None)
-        if self._current_trans_id:
-            row = self.trans_model.find_row_for_trans(self._current_trans_id)
-            if row >= 0:
-                idx = self.trans_model.index(row, 0)
-                self.transaction_view.setCurrentIndex(idx)
-                QTimer.singleShot(0, lambda r=row: self._scroll_to_center_row(r))
+        if self._virtual_mode is not None:
+            if self._virtual_mode == VIRTUAL_IMBALANCE_ID:
+                trans_ids = self.integrity_service.get_imbalanced_trans_ids()
+            elif self._virtual_mode == VIRTUAL_EMPTY_ID:
+                empty = self.integrity_service.get_empty_transactions()
+                trans_ids = [t.id for t in empty]
             else:
-                self._current_trans_id = None
+                trans_ids = []
+            self.trans_model.load_by_ids(trans_ids)
         else:
-            self.transaction_view.scrollToBottom()
-
-    def _load_virtual_transactions(self, virtual_id: int):
-        """Load transactions for virtual nodes (imbalance, empty)."""
-        if virtual_id == VIRTUAL_IMBALANCE_ID:
-            trans_ids = self.integrity_service.get_imbalanced_trans_ids()
-        elif virtual_id == VIRTUAL_EMPTY_ID:
-            empty = self.integrity_service.get_empty_transactions()
-            trans_ids = [t.id for t in empty]
-        else:
-            trans_ids = []
-        self.trans_model.load_by_ids(trans_ids)
+            self.trans_model.load(self._selected_account_ids)
         QApplication.processEvents()
         self.split_model.load(None)
         if self._current_trans_id:
@@ -635,8 +620,9 @@ class MainWindow(QMainWindow):
         self._load_transactions()
 
     def _scroll_to_center_row(self, row: int):
+        visible_rows = self.transaction_view.viewport().height() // self.transaction_view.rowHeight(0)
         sb = self.transaction_view.verticalScrollBar()
-        sb.setValue(row * self.transaction_view.rowHeight(0) - self.transaction_view.viewport().height() // 2)
+        sb.setValue(max(0, row - visible_rows // 2))
 
     def _on_split_go_to_account(self, account_id: int):
         sel_model = self.account_tree.selectionModel()
@@ -909,10 +895,7 @@ class MainWindow(QMainWindow):
         self.settings.transaction_view_mode = mode
         self.act_detailed.setChecked(mode == "detailed")
         self.act_aggregated.setChecked(mode == "aggregated")
-        if self._virtual_mode is not None:
-            self._load_virtual_transactions(self._virtual_mode)
-        else:
-            self._load_transactions()
+        self._load_transactions()
 
     def _check_foreign_keys(self):
         """Check foreign key violations before any database operations.
