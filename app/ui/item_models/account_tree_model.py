@@ -186,6 +186,15 @@ class AccountTreeModel(QAbstractItemModel):
         if role == Qt.ItemDataRole.UserRole:
             return acc.id if not node.is_virtual else node.virtual_id
 
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            if col in (COL_TOTAL_BALANCE, COL_OWN_BALANCE):
+                align = str(self.settings.get("balance_alignment"))
+                mapping = {
+                    "left": Qt.AlignmentFlag.AlignLeft,
+                    "right": Qt.AlignmentFlag.AlignRight,
+                }
+                return mapping.get(align, Qt.AlignmentFlag.AlignRight)
+
         if role == Qt.ItemDataRole.ForegroundRole and acc.is_hidden:
             return QColor(150, 150, 150)
         return None
@@ -202,7 +211,8 @@ class AccountTreeModel(QAbstractItemModel):
             if quants == 0:
                 continue
             parts.append(self.formatter.format_with_currency(quants, cid))
-        return ", ".join(parts)
+        sep = str(self.settings.get("balance_separator"))
+        return sep.join(parts)
 
     def headerData(self, section: int, orientation: Qt.Orientation,
                    role: int = Qt.ItemDataRole.DisplayRole):

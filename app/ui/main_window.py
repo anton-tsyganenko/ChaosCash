@@ -187,7 +187,7 @@ class MainWindow(QMainWindow):
             "QTableView::item:focus, QTreeView::item:focus { border: 2px solid #1e88e5; }"
             "QTableView::item:selected:focus, QTreeView::item:selected:focus { border: 2px solid #1e88e5; }"
         )
-        self.account_tree.setStyleSheet(focus_style)
+        self.account_tree._apply_grid_style(focus_style)
         self.transaction_view.setStyleSheet(focus_style)
         self.split_view.setStyleSheet(focus_style)
 
@@ -993,6 +993,7 @@ class MainWindow(QMainWindow):
         if dlg.exec():
             self.account_model.reload()
             self.account_tree.expandAll()
+            self.account_tree._apply_grid_style()
             if self._selected_account_ids:
                 self.trans_model.load(self._selected_account_ids)
             if self._current_trans_id:

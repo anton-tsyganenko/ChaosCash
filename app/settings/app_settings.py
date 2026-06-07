@@ -15,6 +15,9 @@ _DEFAULTS = {
     "allow_grouping_accounts_for_splits": False,
     "transaction_view_mode": "detailed",  # detailed | aggregated
     "reports_output_dir": str(Path.home() / "ChaosCash_reports"),
+    "balance_separator": "\n",
+    "balance_alignment": "right",
+    "show_account_tree_grid": True,
 }
 
 

@@ -1,7 +1,14 @@
 """Account tree view with context menu and drag-and-drop."""
-from PyQt6.QtCore import QItemSelectionModel, QModelIndex, Qt, pyqtSignal
+from PyQt6.QtCore import QItemSelectionModel, QModelIndex, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QAction
-from PyQt6.QtWidgets import QAbstractItemView, QApplication, QMenu, QTreeView
+from PyQt6.QtWidgets import (
+    QAbstractItemView,
+    QApplication,
+    QMenu,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
+    QTreeView,
+)
 
 from app.i18n import tr
 from app.repositories.account_repo import AccountRepo
@@ -14,6 +21,29 @@ from app.ui.widgets.view_helpers import (
     set_column_visibility,
     show_column_visibility_menu,
 )
+
+
+class _TreeDelegate(QStyledItemDelegate):
+    """Delegate for account tree cells with multi-line support."""
+
+    def initStyleOption(self, option, index):
+        super().initStyleOption(option, index)
+        text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+        if "\n" in text:
+            option.textElideMode = Qt.TextElideMode.ElideNone
+            option.features |= QStyleOptionViewItem.ViewItemFeature.WrapText
+
+    def sizeHint(self, option, index):
+        view = self.parent()
+        if isinstance(view, QTreeView) and view.isColumnHidden(index.column()):
+            return super().sizeHint(option, index)
+        text = index.data(Qt.ItemDataRole.DisplayRole) or ""
+        if "\n" not in text:
+            return super().sizeHint(option, index)
+        base = super().sizeHint(option, index)
+        lines = text.count("\n") + 1
+        h = option.fontMetrics.height()
+        return QSize(base.width(), lines * h + 4)
 
 
 class AccountTreeView(QTreeView):
@@ -50,6 +80,28 @@ class AccountTreeView(QTreeView):
         header.customContextMenuRequested.connect(self._show_header_menu)
 
         self.setSortingEnabled(True)
+
+        self._ml_delegate = _TreeDelegate(self)
+        self.setItemDelegate(self._ml_delegate)
+        self._base_stylesheet = ""
+
+    def setColumnHidden(self, column: int, hidden: bool) -> None:
+        super().setColumnHidden(column, hidden)
+        self.doItemsLayout()
+
+    def _apply_grid_style(self, base_rules: str | None = None) -> None:
+        if base_rules is not None:
+            self._base_stylesheet = base_rules
+        if self.settings.get("show_account_tree_grid"):
+            grid = (
+                "QTreeView::item {"
+                "  border-bottom: 1px solid #ccc;"
+                #"  border-right: 1px solid #888;"
+                "}"
+            )
+            self.setStyleSheet(self._base_stylesheet + grid)
+        else:
+            self.setStyleSheet(self._base_stylesheet)
 
     def setModel(self, model):
         super().setModel(model)

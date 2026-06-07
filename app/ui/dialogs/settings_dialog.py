@@ -1,5 +1,7 @@
 """Application settings dialog."""
 from PyQt6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -13,6 +15,20 @@ from PyQt6.QtWidgets import (
 
 from app.i18n import tr
 from app.settings.app_settings import AppSettings
+
+_SEP_ESCAPES = {"\\n": "\n", "\\t": "\t", "\\r": "\r"}
+
+
+def _display_sep(sep: str) -> str:
+    for esc, ch in _SEP_ESCAPES.items():
+        sep = sep.replace(ch, esc)
+    return sep
+
+
+def _parse_sep(text: str) -> str:
+    for esc, ch in _SEP_ESCAPES.items():
+        text = text.replace(esc, ch)
+    return text
 
 
 class SettingsDialog(QDialog):
@@ -42,6 +58,23 @@ class SettingsDialog(QDialog):
         self.thousands_sep.setPlaceholderText(tr("Leave empty to disable"))
         self.thousands_sep.setMaxLength(4)
         form.addRow(tr("Thousands separator:"), self.thousands_sep)
+
+        self.balance_sep = QLineEdit(_display_sep(str(self.settings.get("balance_separator"))))
+        self.balance_sep.setPlaceholderText(r"\n")
+        form.addRow(tr("Currency separator in balance:"), self.balance_sep)
+
+        self.balance_alignment = QComboBox()
+        self.balance_alignment.addItem(tr("Left"), "left")
+        self.balance_alignment.addItem(tr("Right"), "right")
+        cur = str(self.settings.get("balance_alignment"))
+        idx = self.balance_alignment.findData(cur)
+        if idx >= 0:
+            self.balance_alignment.setCurrentIndex(idx)
+        form.addRow(tr("Balance alignment:"), self.balance_alignment)
+
+        self.show_grid = QCheckBox(tr("Show grid lines in account tree"))
+        self.show_grid.setChecked(bool(self.settings.get("show_account_tree_grid")))
+        form.addRow(self.show_grid)
 
         layout.addWidget(display_group)
 
@@ -85,4 +118,7 @@ class SettingsDialog(QDialog):
         self.settings.set("thousands_sep", sep)
         self.settings.set("account_path_sep", self.path_sep.text() or ":")
         self.settings.set("reports_output_dir", self.reports_output_dir.text())
+        self.settings.set("balance_separator", _parse_sep(self.balance_sep.text()))
+        self.settings.set("balance_alignment", self.balance_alignment.currentData())
+        self.settings.set("show_account_tree_grid", self.show_grid.isChecked())
         self.accept()

@@ -122,5 +122,10 @@
   "SQLite Database (*.db *.sqlite *.sqlite3 *.gnucash);;All Files (*)": "База SQLite (*.db *.sqlite *.sqlite3 *.gnucash);;Все файлы (*)",
   "GnuCash Import Error": "Ошибка импорта GnuCash",
   "Import completed": "Импорт завершён",
-  "GnuCash data was imported successfully.": "Данные GnuCash успешно импортированы."
+  "GnuCash data was imported successfully.": "Данные GnuCash успешно импортированы.",
+  "Currency separator in balance:": "Разделитель валют в балансе:",
+  "Balance alignment:": "Выравнивание баланса:",
+  "Show grid lines in account tree": "Показывать сетку в дереве счетов",
+  "Left": "По левому краю",
+  "Right": "По правому краю"
 }
