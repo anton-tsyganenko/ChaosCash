@@ -48,6 +48,7 @@ class TransactionView(QTableView):
         header.customContextMenuRequested.connect(self._show_header_menu)
 
         self.setSortingEnabled(True)
+        self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setObjectName("transaction_view")
 
     def setModel(self, model):

@@ -389,6 +389,7 @@ class MainWindow(QMainWindow):
         self.transaction_view.enter_pressed.connect(self._focus_current_transaction_splits)
         self.transaction_view.escape_pressed.connect(self._focus_accounts)
         self.split_view.split_changed.connect(self._on_split_changed)
+        self.split_view.go_to_account.connect(self._on_split_go_to_account)
         self.split_view.escape_pressed.connect(self._focus_transactions)
 
         # React to model data changes
@@ -576,15 +577,15 @@ class MainWindow(QMainWindow):
 
     def _load_transactions(self):
         self.trans_model.load(self._selected_account_ids)
+        QApplication.processEvents()
         self.split_model.load(None)
-        # Re-select current transaction after model reload if it exists
         if self._current_trans_id:
             row = self.trans_model.find_row_for_trans(self._current_trans_id)
             if row >= 0:
-                self.transaction_view.setCurrentIndex(
-                    self.trans_model.index(row, 0))
+                idx = self.trans_model.index(row, 0)
+                self.transaction_view.setCurrentIndex(idx)
+                QTimer.singleShot(0, lambda r=row: self._scroll_to_center_row(r))
             else:
-                # Transaction doesn't exist in new account set, clear selection
                 self._current_trans_id = None
         else:
             self.transaction_view.scrollToBottom()
@@ -599,15 +600,15 @@ class MainWindow(QMainWindow):
         else:
             trans_ids = []
         self.trans_model.load_by_ids(trans_ids)
+        QApplication.processEvents()
         self.split_model.load(None)
-        # Re-select current transaction after model reload if it exists
         if self._current_trans_id:
             row = self.trans_model.find_row_for_trans(self._current_trans_id)
             if row >= 0:
-                self.transaction_view.setCurrentIndex(
-                    self.trans_model.index(row, 0))
+                idx = self.trans_model.index(row, 0)
+                self.transaction_view.setCurrentIndex(idx)
+                QTimer.singleShot(0, lambda r=row: self._scroll_to_center_row(r))
             else:
-                # Transaction doesn't exist in virtual node view, clear selection
                 self._current_trans_id = None
         else:
             self.transaction_view.scrollToBottom()
@@ -632,6 +633,27 @@ class MainWindow(QMainWindow):
         self.balance_service.clear()
         self._refresh_integrity()
         self._load_transactions()
+
+    def _scroll_to_center_row(self, row: int):
+        sb = self.transaction_view.verticalScrollBar()
+        sb.setValue(row * self.transaction_view.rowHeight(0) - self.transaction_view.viewport().height() // 2)
+
+    def _on_split_go_to_account(self, account_id: int):
+        sel_model = self.account_tree.selectionModel()
+        idx = self.account_model.get_index_for_account(account_id)
+        if idx.isValid():
+            sel_model.blockSignals(True)
+            try:
+                sel_model.select(
+                    idx,
+                    QItemSelectionModel.SelectionFlag.ClearAndSelect
+                    | QItemSelectionModel.SelectionFlag.Rows,
+                )
+                self.account_tree.setCurrentIndex(idx)
+                self.account_tree.scrollTo(idx)
+            finally:
+                sel_model.blockSignals(False)
+        self._on_accounts_selected([account_id])
 
     def _on_split_changed(self, force: bool = False):
         if not force and self.split_view.state() == QAbstractItemView.State.EditingState:

@@ -19,6 +19,7 @@ class SplitView(QTableView):
     """Table view for splits of the selected transaction."""
 
     split_changed = pyqtSignal()  # notify parent of changes
+    go_to_account = pyqtSignal(int)  # account ID to navigate to
 
     escape_pressed = pyqtSignal()
 
@@ -109,6 +110,10 @@ class SplitView(QTableView):
             return
 
         menu = QMenu(self)
+        goto_action = QAction(tr("&Go to Account"), self)
+        goto_action.triggered.connect(lambda: self.go_to_account.emit(split.account))
+        menu.addAction(goto_action)
+        menu.addSeparator()
         del_action = QAction(tr("&Delete Split"), self)
         del_action.triggered.connect(lambda: self._delete_split(split.id))
         menu.addAction(del_action)
