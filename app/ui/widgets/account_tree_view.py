@@ -1,5 +1,5 @@
 """Account tree view with context menu and drag-and-drop."""
-from PyQt6.QtCore import QItemSelectionModel, QModelIndex, QSize, Qt, pyqtSignal
+from PyQt6.QtCore import QItemSelection, QItemSelectionModel, QModelIndex, QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QAction
 from PyQt6.QtWidgets import (
     QAbstractItemView,
@@ -170,7 +170,6 @@ class AccountTreeView(QTreeView):
 
             additive = bool(modifiers & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier))
             self._select_account_ids(selected_ids, additive=additive)
-            self.account_selected.emit(list(selected_ids))
             return
 
         if modifiers & (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier):
@@ -188,12 +187,19 @@ class AccountTreeView(QTreeView):
         if not additive:
             sel_model.clearSelection()
 
-        flags = QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
+        selection = QItemSelection()
         for account_id in account_ids:
             idx = model.get_index_for_account(account_id)
             if idx.isValid():
-                sel_model.select(idx, flags)
-                self.scrollTo(idx)
+                selection.select(idx, idx)
+
+        if not selection.isEmpty():
+            flags = (QItemSelectionModel.SelectionFlag.Select |
+                     QItemSelectionModel.SelectionFlag.Rows)
+            sel_model.select(selection, flags)
+
+        self.viewport().update()
+
 
     def _on_selection_changed(self):
         model: AccountTreeModel = self.model()
