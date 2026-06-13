@@ -84,7 +84,6 @@
   "No parent (top level)": "Без родителя (верхний уровень)",
   "Delete all splits (can create imbalance)": "Удалить все строки проводок (может создать дисбаланс)",
   "Delete all transactions (can affect balance on other accounts)": "Удалить все транзакции (может повлиять на баланс на других счётах)",
-  "Delete account": "Удалить счёт",
   "Error: invalid expression": "Ошибка: неверное выражение",
   "Open after generation": "Открыть после генерации",
   "No split": "Без разбивки",
@@ -127,5 +126,8 @@
   "Balance alignment:": "Выравнивание баланса:",
   "Show grid lines in account tree": "Показывать сетку в дереве счетов",
   "Left": "По левому краю",
-  "Right": "По правому краю"
+  "Right": "По правому краю",
+  "accounts selected": "счетов выбрано",
+  "&Hide/Delete": "&Скрыть/Удалить",
+  "Delete account(s): ": "Удалить счет(а): "
 }

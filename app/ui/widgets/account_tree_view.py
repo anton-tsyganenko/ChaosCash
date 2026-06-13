@@ -113,6 +113,10 @@ class AccountTreeView(QTreeView):
         if self.state() == QAbstractItemView.State.EditingState:
             super().keyPressEvent(event)
             return
+        if event.key() == Qt.Key.Key_Delete:
+            self._delete_account()
+            event.accept()
+            return
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             self.enter_pressed.emit()
             event.accept()
@@ -200,18 +204,24 @@ class AccountTreeView(QTreeView):
 
         self.viewport().update()
 
-
-    def _on_selection_changed(self):
+    def _collect_selected_account_ids(self) -> list[int]:
         model: AccountTreeModel = self.model()
         if model is None:
-            return
-        selected_ids = []
+            return []
+        ids = []
         for index in self.selectedIndexes():
             if index.column() != 0:
                 continue
             node = model.get_node(index)
             if node and node.account and not node.is_virtual:
-                selected_ids.append(node.account.id)
+                ids.append(node.account.id)
+        return list(dict.fromkeys(ids))
+
+    def _get_selected_real_account_ids(self) -> list[int]:
+        return self._collect_selected_account_ids()
+
+    def _on_selection_changed(self):
+        selected_ids = self._collect_selected_account_ids()
         if selected_ids:
             self.account_selected.emit(selected_ids)
 
@@ -228,13 +238,12 @@ class AccountTreeView(QTreeView):
         add_action.triggered.connect(lambda: self._add_account(index if index.isValid() else QModelIndex()))
         menu.addAction(add_action)
 
-        if index.isValid():
-            node = model.get_node(index)
-            if node and not node.is_virtual and node.account:
-                menu.addSeparator()
-                del_action = QAction(tr("&Delete Account"), self)
-                del_action.triggered.connect(lambda: self._delete_account(index))
-                menu.addAction(del_action)
+        selected_ids = self._get_selected_real_account_ids()
+        if selected_ids:
+            menu.addSeparator()
+            del_action = QAction(tr("&Hide/Delete"), self)
+            del_action.triggered.connect(self._delete_account)
+            menu.addAction(del_action)
 
         menu.exec(self.viewport().mapToGlobal(pos))
 
@@ -256,37 +265,27 @@ class AccountTreeView(QTreeView):
             self.scrollTo(new_index)
             self.edit(new_index)
 
-    def _delete_account(self, index: QModelIndex):
+    def _delete_account(self):
         model: AccountTreeModel = self.model()
-        node = model.get_node(index)
-        if node is None or node.account is None:
+        selected_ids = self._get_selected_real_account_ids()
+        if not selected_ids:
             return
-        acc = node.account
 
-        dlg = DeleteAccountDialog(acc.name, self.account_repo, self.split_repo, self.settings, acc.id, self)
+        dlg = DeleteAccountDialog.for_batch(
+            selected_ids, self.account_repo, self.split_repo, self.settings, self
+        )
         if dlg.exec() != DeleteAccountDialog.DialogCode.Accepted:
             return
 
         action = dlg.action
         if action == DeleteAccountDialog.HIDE:
-            self.account_repo.update_hidden(acc.id, True)
+            for aid in selected_ids:
+                self.account_repo.update_hidden(aid, True)
         elif action == DeleteAccountDialog.DELETE:
-            descendants = self.account_repo.get_all_descendants(acc.id)
-
-            # Handle sub-accounts
-            if dlg.subaccounts_action == DeleteAccountDialog.MOVE_SUBACCOUNTS:
-                # Move direct children to target account
-                target_id = dlg.subaccounts_target_id
-                if target_id is not None:
-                    children = self.account_repo.get_children(acc.id)
-                    for child in children:
-                        self.account_repo.update_parent(child.id, target_id)
-            # Handle transactions - get list of accounts to process.
-            # If sub-accounts are moved, only process the account being deleted.
-            # Descendants remain and keep their own splits/transactions.
-            accounts_to_process = [acc.id]
+            accounts_to_process = list(selected_ids)
             if dlg.subaccounts_action == DeleteAccountDialog.DELETE_SUBACCOUNTS:
-                accounts_to_process.extend(descendants)
+                for aid in selected_ids:
+                    accounts_to_process.extend(self.account_repo.get_all_descendants(aid))
 
             if dlg.transactions_action == DeleteAccountDialog.MOVE_SPLITS:
                 target_id = dlg.transactions_target_id
@@ -304,11 +303,11 @@ class AccountTreeView(QTreeView):
                     self.trans_repo.delete(tid)
 
             if dlg.subaccounts_action == DeleteAccountDialog.DELETE_SUBACCOUNTS:
-                # Delete all sub-accounts recursively after dependent splits/trans are handled
-                self._delete_all_descendants(acc.id)
+                for aid in selected_ids:
+                    self._delete_all_descendants(aid)
 
-            # Delete the account
-            self.account_repo.delete(acc.id)
+            for aid in selected_ids:
+                self.account_repo.delete(aid)
 
         self.balance_service.clear()
         model.reload()
